@@ -5,6 +5,7 @@
     "deploy": "wrangler deploy --minify"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.0",
     "@hono/zod-validator": "^0.2.2",
     "hono": "^4.7.4",
     "zod": "^3.22.4"

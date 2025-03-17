@@ -1,522 +1,282 @@
 import { Hono } from 'hono'
-import geminiRouter from './api/gemini'
-import geminiImageRouter from './api/gemini-image'
+import { serveStatic } from 'hono/cloudflare-workers'
+import { cors } from 'hono/cors'
 
-// Define environment interface
 interface Env {
   GOOGLE_API_KEY: string;
 }
 
-// Define interface for image generation requests
-interface GeminiImageRequest {
-  contents: Array<{
-    role?: string;
-    parts: Array<{
-      text?: string;
-    } | {
-      inline_data: {
-        mime_type: string;
-        data: string;
-      }
-    }>
-  }>;
-  generationConfig?: {
-    temperature?: number;
-    topP?: number;
-    topK?: number;
-    maxOutputTokens?: number;
-    responseMimeType?: string;
-  };
-  responseModalities?: string[]; // This won't be used in API calls
-}
-
 const app = new Hono<{ Bindings: Env }>()
 
-app.get('/', (c) => {
-  return c.text('Hello Hono!')
+app.use('/static/*', serveStatic({ root: './', manifest: {} }))
+
+// Serve the frontend
+app.get('/', async (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Virtual Try-On</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-gray-100 min-h-screen p-8">
+        <div class="max-w-4xl mx-auto">
+            <h1 class="text-3xl font-bold mb-8 text-center">Virtual Try-On</h1>
+            
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Person Image Upload -->
+                    <div class="space-y-4">
+                        <h2 class="text-xl font-semibold">Your Photo</h2>
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                            <input type="file" id="personImage" accept="image/*" class="hidden">
+                            <label for="personImage" class="cursor-pointer block">
+                                <div id="personPreview" class="aspect-square bg-gray-50 flex items-center justify-center">
+                                    <span class="text-gray-500">Click to upload your photo</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Clothing Image Upload -->
+                    <div class="space-y-4">
+                        <h2 class="text-xl font-semibold">Clothing Item</h2>
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                            <input type="file" id="clothingImage" accept="image/*" class="hidden">
+                            <label for="clothingImage" class="cursor-pointer block">
+                                <div id="clothingPreview" class="aspect-square bg-gray-50 flex items-center justify-center">
+                                    <span class="text-gray-500">Click to upload clothing</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Try On Button -->
+                <div class="mt-6 text-center">
+                    <button id="tryOnButton" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50" disabled>
+                        Try On
+                    </button>
+                </div>
+
+                <!-- Result Section -->
+                <div id="resultSection" class="mt-8 hidden">
+                    <h2 class="text-xl font-semibold mb-4">Result</h2>
+                    <div id="resultImage" class="aspect-square bg-gray-50 flex items-center justify-center rounded-lg"></div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            let personFile = null;
+            let clothingFile = null;
+
+            function updateButtonState() {
+                const button = document.getElementById('tryOnButton');
+                button.disabled = !personFile || !clothingFile;
+            }
+
+            function setupImageUpload(inputId, previewId, setter) {
+                const input = document.getElementById(inputId);
+                const preview = document.getElementById(previewId);
+
+                input.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        setter(file);
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            preview.innerHTML = \`<img src="\${e.target.result}" class="max-w-full max-h-full object-contain">\`;
+                        };
+                        reader.readAsDataURL(file);
+                        updateButtonState();
+                    }
+                });
+            }
+
+            setupImageUpload('personImage', 'personPreview', (file) => personFile = file);
+            setupImageUpload('clothingImage', 'clothingPreview', (file) => clothingFile = file);
+
+            document.getElementById('tryOnButton').addEventListener('click', async () => {
+                if (!personFile || !clothingFile) return;
+
+                const formData = new FormData();
+                formData.append('person', personFile);
+                formData.append('clothing', clothingFile);
+
+                try {
+                    const response = await fetch('/api/tryon', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) throw new Error('Failed to process images');
+
+                    const result = await response.blob();
+                    const resultUrl = URL.createObjectURL(result);
+                    
+                    document.getElementById('resultSection').classList.remove('hidden');
+                    document.getElementById('resultImage').innerHTML = \`
+                        <img src="\${resultUrl}" class="max-w-full max-h-full object-contain">
+                    \`;
+                } catch (error) {
+                    alert('Error: ' + error.message);
+                }
+            });
+        </script>
+    </body>
+    </html>
+  `)
 })
 
-// Mount the Gemini API endpoints
-app.route('/api/gemini', geminiRouter)
-app.route('/api/gemini-image', geminiImageRouter)
-
-// Debug route for direct testing
-app.post('/api/debug-image', async (c) => {
-  const apiKey = c.env.GOOGLE_API_KEY;
-
-  if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'API key not configured' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-
+// API endpoint for try-on
+app.post('/api/tryon', async (c) => {
   try {
-    // Log the request body for debugging
-    const requestBody = await c.req.json() as GeminiImageRequest;
+    const formData = await c.req.formData()
+    const personImage = formData.get('person') as File
+    const clothingImage = formData.get('clothing') as File
 
-    // Create a sanitized version of the request data
-    const sanitizedRequestData = {
-      contents: requestBody.contents,
-      generationConfig: requestBody.generationConfig || {}
-    };
-
-    // Ensure generationConfig contains responseMimeType
-    if (!sanitizedRequestData.generationConfig.responseMimeType) {
-      sanitizedRequestData.generationConfig.responseMimeType = "image/png";
+    if (!personImage || !clothingImage) {
+      console.error('Missing required images:', { person: !!personImage, clothing: !!clothingImage })
+      throw new Error('Both person and clothing images are required')
     }
 
-    console.log('Debug - Request body:', JSON.stringify(sanitizedRequestData));
+    console.log('Processing images:', {
+      personType: personImage.type,
+      personSize: personImage.size,
+      clothingType: clothingImage.type,
+      clothingSize: clothingImage.size
+    })
 
-    // Forward the request to Google API
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(sanitizedRequestData)
-    });
+    // Convert images to base64
+    const personBuffer = await personImage.arrayBuffer()
+    const clothingBuffer = await clothingImage.arrayBuffer()
 
-    console.log('Debug - Status code:', response.status);
-    console.log('Debug - Status text:', response.statusText);
+    console.log('Converted images to buffers:', {
+      personBufferSize: personBuffer.byteLength,
+      clothingBufferSize: clothingBuffer.byteLength
+    })
 
-    // Log all response headers
-    const headerObj: Record<string, string> = {};
-    response.headers.forEach((value, key) => {
-      headerObj[key] = value;
-    });
-    console.log('Debug - Response headers:', JSON.stringify(headerObj));
+    const personBase64 = btoa(String.fromCharCode(...new Uint8Array(personBuffer)))
+    const clothingBase64 = btoa(String.fromCharCode(...new Uint8Array(clothingBuffer)))
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Debug - Error response:', errorText);
-      try {
-        const errorJson = JSON.parse(errorText);
-        return new Response(JSON.stringify({ error: 'API Error', details: errorJson }), {
-          status: response.status,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      } catch (e) {
-        return new Response(JSON.stringify({ error: 'API Error', rawResponse: errorText }), {
-          status: response.status,
-          headers: { 'Content-Type': 'application/json' }
-        });
+    console.log('Converted buffers to base64:', {
+      personBase64Length: personBase64.length,
+      clothingBase64Length: clothingBase64.length
+    })
+
+    // Prepare the request for Gemini API
+    const requestBody = {
+      contents: [
+        {
+          parts: [
+            {
+              fileData: {
+                mimeType: personImage.type,
+                data: personBase64
+              }
+            },
+            {
+              text: "This is a picture of me"
+            }
+          ],
+          role: "user"
+        },
+        {
+          parts: [
+            {
+              text: "I understand this is a picture of you and you want to try on some clothing."
+            }
+          ],
+          role: "model"
+        },
+        {
+          parts: [
+            {
+              text: "Here is the clothing item I want to try on."
+            },
+            {
+              fileData: {
+                mimeType: clothingImage.type,
+                data: clothingBase64
+              }
+            }
+          ],
+          role: "user"
+        },
+        {
+          parts: [
+            {
+              text: "Please generate an image of me wearing this clothing item, maintaining my pose and appearance while naturally integrating the clothing."
+            }
+          ],
+          role: "user"
+        }
+      ],
+      generationConfig: {
+        temperature: 0.5,
+        topP: 0.5,
+        topK: 40,
+        maxOutputTokens: 8192,
+        responseMimeType: "image/png"
       }
     }
 
-    // Check content type
-    const contentType = response.headers.get('content-type');
-    console.log('Debug - Content-Type:', contentType);
-
-    if (contentType && contentType.includes('image')) {
-      const imageBuffer = await response.arrayBuffer();
-      return new Response(imageBuffer, {
-        headers: { 'Content-Type': contentType }
-      });
+    const apiKey = c.env?.GOOGLE_API_KEY
+    if (!apiKey) {
+      console.error('API key not configured')
+      throw new Error('API key not configured')
     }
 
-    // Return JSON response
-    const data = await response.json();
-    return new Response(JSON.stringify(data), {
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    console.error('Debug - Error:', error);
-    return new Response(JSON.stringify({ error: 'Debug API error', message: String(error) }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    console.log('Sending request to Gemini API...')
+
+    const apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent?key=' + apiKey
+
+    const response = await fetch(
+      apiUrl,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      }
+    )
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Gemini API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText
+      })
+      throw new Error(`Failed to generate image: ${response.status} ${response.statusText} `)
+    }
+
+    console.log('Successfully received response from Gemini API')
+
+    const blob = await response.blob()
+    console.log('Converted response to blob:', {
+      size: blob.size,
+      type: blob.type
+    })
+
+    return new Response(blob, {
+      headers: { 'Content-Type': 'image/png' }
+    })
+  } catch (error: any) {
+    console.error('Error in /api/tryon:', {
+      message: error?.message,
+      stack: error?.stack,
+      cause: error?.cause
+    })
+    return c.json({
+      error: error?.message || 'Unknown error',
+      details: error?.stack
+    }, 500)
   }
-});
-
-// Inline the test client HTML content
-app.get('/test', (c) => {
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini API Test Client</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            line-height: 1.6;
-        }
-        textarea {
-            width: 100%;
-            height: 100px;
-            margin-bottom: 10px;
-            padding: 8px;
-            border-radius: 4px;
-            border: 1px solid #ccc;
-        }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 15px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        pre {
-            background-color: #f5f5f5;
-            padding: 15px;
-            border-radius: 4px;
-            overflow-x: auto;
-            max-height: 500px;
-            border: 1px solid #ddd;
-        }
-        .response-container {
-            margin-top: 20px;
-        }
-        .tabs {
-            display: flex;
-            margin-bottom: 20px;
-            border-bottom: 1px solid #ddd;
-        }
-        .tab {
-            padding: 10px 15px;
-            cursor: pointer;
-            border: 1px solid transparent;
-            border-bottom: none;
-            border-radius: 4px 4px 0 0;
-            margin-right: 5px;
-        }
-        .tab.active {
-            background-color: #f5f5f5;
-            border-color: #ddd;
-            border-bottom-color: #f5f5f5;
-        }
-        .tab-content {
-            display: none;
-        }
-        .tab-content.active {
-            display: block;
-        }
-        .file-input-container {
-            margin-bottom: 15px;
-        }
-        .preview-container {
-            margin: 15px 0;
-            max-width: 100%;
-        }
-        .preview-container img {
-            max-width: 100%;
-            max-height: 300px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        .no-image {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 150px;
-            border: 1px dashed #ccc;
-            border-radius: 4px;
-            color: #999;
-        }
-        .debug-checkbox {
-            margin-top: 10px;
-            margin-bottom: 10px;
-        }
-        .json-editor {
-            width: 100%;
-            height: 200px;
-            font-family: monospace;
-            margin-top: 10px;
-            margin-bottom: 10px;
-            padding: 8px;
-        }
-    </style>
-</head>
-<body>
-    <h1>Gemini API Test Client</h1>
-    
-    <div class="tabs">
-        <div class="tab active" data-tab="text">Text Generation</div>
-        <div class="tab" data-tab="image">Image Generation</div>
-    </div>
-
-    <div id="text-tab" class="tab-content active">
-        <h2>Enter your prompt:</h2>
-        <textarea id="prompt" placeholder="Enter your prompt here...">Explain how AI works</textarea>
-        
-        <button onclick="callGeminiAPI()">Submit</button>
-        
-        <div class="response-container">
-            <h2>Response:</h2>
-            <pre id="response">Response will appear here...</pre>
-        </div>
-    </div>
-
-    <div id="image-tab" class="tab-content">
-        <h2>Image Generation</h2>
-        
-        <div class="file-input-container">
-            <label for="image-upload">Upload an image:</label>
-            <input type="file" id="image-upload" accept="image/*" onchange="handleImageUpload(event)">
-        </div>
-        
-        <div class="preview-container">
-            <div id="image-preview" class="no-image">No image selected</div>
-        </div>
-        
-        <h3>Enter your prompt:</h3>
-        <textarea id="image-prompt" placeholder="Describe how to modify the image...">change elephant to a bulldozer</textarea>
-        
-        <div style="margin-top: 10px;">
-            <label for="temperature">Temperature:</label>
-            <input type="range" id="temperature" min="0" max="1" step="0.1" value="1">
-            <span id="temperature-value">1</span>
-        </div>
-        
-        <div class="debug-checkbox">
-            <label>
-                <input type="checkbox" id="debug-mode" onchange="toggleDebugMode()"> 
-                Debug Mode (Direct API access)
-            </label>
-        </div>
-        
-        <div id="debug-container" style="display: none;">
-            <h4>API Request JSON:</h4>
-            <textarea id="debug-json" class="json-editor"></textarea>
-        </div>
-        
-        <button onclick="callGeminiImageAPI()" style="margin-top: 10px;">Generate Image</button>
-        
-        <div class="response-container">
-            <h2>Generated Image:</h2>
-            <div id="image-response">
-                <div class="no-image">Generated image will appear here</div>
-            </div>
-            <pre id="image-error" style="display: none;">Error will appear here...</pre>
-        </div>
-    </div>
-
-    <script>
-        // Tab switching
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-                
-                tab.classList.add('active');
-                document.getElementById(tab.dataset.tab + '-tab').classList.add('active');
-            });
-        });
-        
-        // Range slider update
-        document.getElementById('temperature').addEventListener('input', function() {
-            document.getElementById('temperature-value').textContent = this.value;
-        });
-        
-        // Text API
-        async function callGeminiAPI() {
-            const promptText = document.getElementById('prompt').value;
-            const responseElement = document.getElementById('response');
-            
-            responseElement.textContent = 'Loading...';
-            
-            try {
-                const response = await fetch('/api/gemini', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [{ text: promptText }]
-                        }]
-                    })
-                });
-                
-                const data = await response.json();
-                responseElement.textContent = JSON.stringify(data, null, 2);
-            } catch (error) {
-                responseElement.textContent = \`Error: \${error.message}\`;
-            }
-        }
-        
-        // Image handling
-        let imageBase64 = null;
-        let imageType = null;
-        
-        function handleImageUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const result = e.target.result;
-                imageBase64 = result.split(',')[1]; // Remove the data URL prefix
-                imageType = file.type;
-                
-                const preview = document.getElementById('image-preview');
-                preview.innerHTML = '';
-                preview.classList.remove('no-image');
-                
-                const img = document.createElement('img');
-                img.src = result;
-                preview.appendChild(img);
-                
-                // Update debug JSON if in debug mode
-                if (document.getElementById('debug-mode').checked) {
-                    updateDebugJson();
-                }
-            };
-            reader.readAsDataURL(file);
-        }
-        
-        function toggleDebugMode() {
-            const debugContainer = document.getElementById('debug-container');
-            const isDebugMode = document.getElementById('debug-mode').checked;
-            
-            debugContainer.style.display = isDebugMode ? 'block' : 'none';
-            
-            if (isDebugMode) {
-                updateDebugJson();
-            }
-        }
-        
-        function updateDebugJson() {
-            if (!imageBase64) return;
-            
-            const promptText = document.getElementById('image-prompt').value;
-            const temperature = parseFloat(document.getElementById('temperature').value);
-            
-            const requestObj = {
-                contents: [{
-                    role: "user",
-                    parts: [
-                        {
-                            inline_data: {
-                                mime_type: imageType,
-                                data: imageBase64
-                            }
-                        },
-                        {
-                            text: promptText
-                        }
-                    ]
-                }],
-                generationConfig: {
-                    temperature: temperature,
-                    topP: 0.95,
-                    topK: 40,
-                    maxOutputTokens: 8192,
-                    responseMimeType: "image/png"
-                }
-            };
-            
-            document.getElementById('debug-json').value = JSON.stringify(requestObj, null, 2);
-        }
-        
-        // Image generation API
-        async function callGeminiImageAPI() {
-            if (!imageBase64) {
-                alert('Please upload an image first.');
-                return;
-            }
-            
-            const isDebugMode = document.getElementById('debug-mode').checked;
-            const imageResponseElement = document.getElementById('image-response');
-            const errorElement = document.getElementById('image-error');
-            
-            imageResponseElement.innerHTML = '<div class="no-image">Loading...</div>';
-            errorElement.style.display = 'none';
-            
-            try {
-                let requestBody;
-                
-                if (isDebugMode) {
-                    // Use the JSON from the debug editor
-                    try {
-                        requestBody = JSON.parse(document.getElementById('debug-json').value);
-                    } catch (e) {
-                        alert('Invalid JSON in the debug editor');
-                        return;
-                    }
-                } else {
-                    // Build the request body normally
-                    const promptText = document.getElementById('image-prompt').value;
-                    const temperature = parseFloat(document.getElementById('temperature').value);
-                    
-                    requestBody = {
-                        contents: [{
-                            role: "user",
-                            parts: [
-                                {
-                                    inline_data: {
-                                        mime_type: imageType,
-                                        data: imageBase64
-                                    }
-                                },
-                                {
-                                    text: promptText
-                                }
-                            ]
-                        }],
-                        generationConfig: {
-                            temperature: temperature,
-                            topP: 0.95,
-                            topK: 40,
-                            maxOutputTokens: 8192,
-                            responseMimeType: "image/png"
-                        }
-                    };
-                }
-                
-                // Choose the endpoint based on debug mode
-                const endpoint = isDebugMode ? '/api/debug-image' : '/api/gemini-image';
-                
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(requestBody)
-                });
-                
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(JSON.stringify(errorData, null, 2));
-                }
-                
-                const contentType = response.headers.get('content-type');
-                
-                if (contentType && contentType.includes('image')) {
-                    // Handle image response
-                    const blob = await response.blob();
-                    const imageUrl = URL.createObjectURL(blob);
-                    
-                    imageResponseElement.innerHTML = '';
-                    const img = document.createElement('img');
-                    img.src = imageUrl;
-                    imageResponseElement.appendChild(img);
-                } else {
-                    // Handle JSON response
-                    const data = await response.json();
-                    errorElement.textContent = JSON.stringify(data, null, 2);
-                    errorElement.style.display = 'block';
-                    imageResponseElement.innerHTML = '<div class="no-image">No image generated</div>';
-                }
-            } catch (error) {
-                errorElement.textContent = \`Error: \${error.message}\`;
-                errorElement.style.display = 'block';
-                imageResponseElement.innerHTML = '<div class="no-image">Failed to generate image</div>';
-            }
-        }
-    </script>
-</body>
-</html>`;
-  return c.html(html);
 })
 
 export default app
