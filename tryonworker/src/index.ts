@@ -169,58 +169,56 @@ app.post('/api/tryon', async (c) => {
 
     // Prepare the request for Gemini API
     const requestBody = {
-      contents: [
-        {
-          parts: [
-            {
-              fileData: {
-                mimeType: personImage.type,
-                data: personBase64
-              }
-            },
-            {
-              text: "This is a picture of me"
+      contents: [{
+        role: "user",
+        parts: [
+          {
+            text: "This is a picture of me"
+          },
+          {
+            inline_data: {
+              mime_type: personImage.type,
+              data: personBase64
             }
-          ],
-          role: "user"
-        },
-        {
-          parts: [
-            {
-              text: "I understand this is a picture of you and you want to try on some clothing."
+          }
+        ]
+      },
+      {
+        role: "model",
+        parts: [
+          {
+            text: "I understand this is a picture of you. What would you like me to do with it?"
+          }
+        ]
+      },
+      {
+        role: "user",
+        parts: [
+          {
+            text: "Here is the clothing item I want to try on"
+          },
+          {
+            inline_data: {
+              mime_type: clothingImage.type,
+              data: clothingBase64
             }
-          ],
-          role: "model"
-        },
-        {
-          parts: [
-            {
-              text: "Here is the clothing item I want to try on."
-            },
-            {
-              fileData: {
-                mimeType: clothingImage.type,
-                data: clothingBase64
-              }
-            }
-          ],
-          role: "user"
-        },
-        {
-          parts: [
-            {
-              text: "Please generate an image of me wearing this clothing item, maintaining my pose and appearance while naturally integrating the clothing."
-            }
-          ],
-          role: "user"
-        }
-      ],
+          }
+        ]
+      },
+      {
+        role: "user",
+        parts: [
+          {
+            text: "Please generate an image of me wearing this clothing item, maintaining my pose and appearance while naturally integrating the clothing."
+          }
+        ]
+      }],
       generationConfig: {
         temperature: 0.5,
         topP: 0.5,
         topK: 40,
         maxOutputTokens: 8192,
-        responseMimeType: "image/png"
+        responseModalities: ["Text", "Image"]
       }
     }
 
@@ -257,15 +255,44 @@ app.post('/api/tryon', async (c) => {
 
     console.log('Successfully received response from Gemini API')
 
-    const blob = await response.blob()
-    console.log('Converted response to blob:', {
-      size: blob.size,
-      type: blob.type
-    })
+    // Log the full response
+    const responseText = await response.text()
+    console.log('Raw API Response:', responseText)
 
-    return new Response(blob, {
-      headers: { 'Content-Type': 'image/png' }
-    })
+    try {
+      // Parse the response to get the image data
+      const responseData = JSON.parse(responseText)
+      console.log('Parsed API Response:', {
+        candidates: responseData.candidates,
+        promptFeedback: responseData.promptFeedback
+      })
+
+      // Check if we have image data in the response
+      if (responseData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data) {
+        const base64Image = responseData.candidates[0].content.parts[0].inlineData.data
+        const binaryData = atob(base64Image)
+        const uint8Array = new Uint8Array(binaryData.length)
+        for (let i = 0; i < binaryData.length; i++) {
+          uint8Array[i] = binaryData.charCodeAt(i)
+        }
+
+        const blob = new Blob([uint8Array], { type: 'image/png' })
+        console.log('Created image blob:', {
+          size: blob.size,
+          type: blob.type
+        })
+
+        return new Response(blob, {
+          headers: { 'Content-Type': 'image/png' }
+        })
+      } else {
+        console.error('No image data found in response')
+        throw new Error('No image data in response')
+      }
+    } catch (parseError) {
+      console.error('Error parsing response:', parseError)
+      throw new Error('Failed to parse API response')
+    }
   } catch (error: any) {
     console.error('Error in /api/tryon:', {
       message: error?.message,
