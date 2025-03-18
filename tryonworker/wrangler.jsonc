@@ -9,9 +9,12 @@
   "dev": {
     "port": 8787
   },
-  "vars": {
-    "GOOGLE_API_KEY": ""
-  },
+  "routes": [
+    {
+      "pattern": "tryon.app.juli.sh",
+      "custom_domain": true
+    }
+  ]
   // "kv_namespaces": [
   //   {
   //     "binding": "MY_KV_NAMESPACE",

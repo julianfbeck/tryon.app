@@ -42,8 +42,14 @@ struct TryOnView: View {
                     
                     // Result area
                     if viewModel.isLoading {
-                        ProgressView("Processing...")
-                            .padding()
+                        VStack {
+                            ProgressView()
+                                .padding()
+                            Text("Processing your try-on request...")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(height: 200)
                     } else if let resultImage = viewModel.resultImage {
                         VStack {
                             Text("Try-On Result")
@@ -65,9 +71,16 @@ struct TryOnView: View {
                     
                     // Error message
                     if let errorMessage = viewModel.errorMessage {
-                        Text(errorMessage)
-                            .foregroundColor(.red)
-                            .padding()
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.red)
+                            Text(errorMessage)
+                                .foregroundColor(.red)
+                        }
+                        .padding()
+                        .background(Color.red.opacity(0.1))
+                        .cornerRadius(Constants.cornerRadius)
+                        .padding(.horizontal)
                     }
                     
                     // Action buttons side by side
@@ -82,13 +95,20 @@ struct TryOnView: View {
                                 }
                             }
                         } label: {
-                            Text("Try On")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.accentColor)
-                                .cornerRadius(Constants.cornerRadius)
+                            HStack {
+                                if viewModel.isLoading {
+                                    ProgressView()
+                                        .tint(.white)
+                                        .padding(.trailing, 4)
+                                }
+                                Text(viewModel.isLoading ? "Processing..." : "Try On")
+                                    .font(.headline)
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.accentColor)
+                            .cornerRadius(Constants.cornerRadius)
                         }
                         .disabled(!viewModel.canTryOn || viewModel.isLoading)
                         .opacity(viewModel.canTryOn && !viewModel.isLoading ? 1 : 0.5)
@@ -132,6 +152,17 @@ struct TryOnView: View {
                     showingResultSheet = true
                     viewModel.resultProcessed = false
                 }
+            }
+            .alert(
+                viewModel.appError?.title ?? "Error",
+                isPresented: $viewModel.showingAlert,
+                presenting: viewModel.appError
+            ) { _ in
+                Button("OK") {
+                    // Dismiss the alert
+                }
+            } message: { error in
+                Text(error.message)
             }
         }
     }
