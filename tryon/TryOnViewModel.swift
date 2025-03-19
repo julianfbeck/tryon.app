@@ -165,7 +165,7 @@ class TryOnViewModel: ObservableObject {
             handleNetworkError(error)
         } catch {
             logger.error("Unexpected error during try-on: \(error.localizedDescription)")
-            showError(error: error)
+            showSystemError(error)
         }
         
         isLoading = false
@@ -189,22 +189,21 @@ class TryOnViewModel: ObservableObject {
         case .timeoutError:
             showError(title: "Timeout Error", message: "The server took too long to respond. Please try again later or with smaller images.")
         case .memoryError:
-            showError(title: "Memory Error", message: "Not enough memory to process these images. Try using smaller images or restarting the app.")
-        case .imageTooLarge:
-            showError(title: "Image Size Error", message: "One or both of your images are too large to process. Please select smaller images or take a new photo with your camera.")
+            showError(title: "Memory Error", message: "Not enough memory to process these images. Try using smaller images.")
+        case .compressionError:
+            showError(title: "Compression Error", message: "Failed to compress the images. Please try again.")
         }
     }
     
-    // Show error with custom title and message
-    private func showError(title: String = "Error", message: String) {
+    public func showError(title: String = "Error", message: String) {
         logger.error("\(title): \(message)")
         errorMessage = message
         appError = AppError(title: title, message: message)
         showingAlert = true
     }
     
-    // Show error from an Error object
-    private func showError(error: Error) {
+    // Show error from a system Error object
+    private func showSystemError(_ error: Error) {
         logger.error("Error: \(error.localizedDescription)")
         errorMessage = error.localizedDescription
         appError = AppError(error: error)
@@ -231,7 +230,6 @@ class TryOnViewModel: ObservableObject {
     func setPersonImage(_ image: UIImage?) {
         if let image = image {
             logger.log("Setting person image: \(image.size.width)x\(image.size.height)")
-            DebugUtils.logImageDetails(image: image, label: "Person")
         } else {
             logger.log("Clearing person image")
         }
@@ -242,7 +240,6 @@ class TryOnViewModel: ObservableObject {
     func setClothImage(_ image: UIImage?) {
         if let image = image {
             logger.log("Setting cloth image: \(image.size.width)x\(image.size.height)")
-            DebugUtils.logImageDetails(image: image, label: "Clothing")
         } else {
             logger.log("Clearing cloth image")
         }
@@ -255,22 +252,5 @@ class TryOnViewModel: ObservableObject {
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
         return formatter.string(from: date)
-    }
-    
-    // Monitor for potential issues
-    func checkForPerformanceIssues() {
-        DebugUtils.logMemoryUsage(tag: "TryOnViewModel")
-        let issues = DebugUtils.checkForIssues()
-        
-        if !issues.isEmpty {
-            logger.warning("Performance issues detected: \(issues.joined(separator: ", "))")
-        }
-    }
-    
-    // Debug helper for stack overflow issues
-    func debugCallStack() {
-        logger.log("Capturing call stack for debugging")
-        DebugUtils.logCallStack(tag: "TryOnViewModel")
-        DebugUtils.clearTemporaryFiles()
     }
 } 

@@ -156,7 +156,7 @@ struct TryOnView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Try On")
+//            .navigationTitle("Try On")
             .sheet(isPresented: $showingPersonImagePicker) {
                 ImagePicker(image: $viewModel.personImage, onError: { errorMessage in
                     logger.error("Person image picker error: \(errorMessage)")
@@ -197,22 +197,6 @@ struct TryOnView: View {
             }
             .onDisappear {
                 logger.log("TryOnView disappeared")
-            }
-            // Special debug button that will appear only if there are errors
-            .overlay(alignment: .bottomTrailing) {
-                if viewModel.errorMessage != nil {
-                    Button {
-                        logger.log("Debug button tapped")
-                        viewModel.debugCallStack()
-                        viewModel.checkForPerformanceIssues()
-                    } label: {
-                        Image(systemName: "ladybug")
-                            .foregroundColor(.white)
-                            .padding(8)
-                            .background(Circle().fill(Color.gray.opacity(0.8)))
-                            .padding(16)
-                    }
-                }
             }
         }
     }
@@ -264,15 +248,6 @@ struct TryOnView: View {
                     .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
             )
         }
-    }
-}
-
-extension TryOnViewModel {
-    // Add a public function for showing errors from the view
-    func showError(title: String, message: String) {
-        errorMessage = message
-        appError = AppError(title: title, message: message)
-        showingAlert = true
     }
 }
 

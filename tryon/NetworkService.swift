@@ -11,7 +11,7 @@ enum NetworkError: Error {
     case noData
     case timeoutError
     case memoryError
-    case imageTooLarge
+    case compressionError
     
     var localizedDescription: String {
         switch self {
@@ -31,8 +31,8 @@ enum NetworkError: Error {
             return "Request timed out. The server is taking too long to respond."
         case .memoryError:
             return "Memory error: Not enough memory to process the images"
-        case .imageTooLarge:
-            return "One or both images are too large. Please use smaller images."
+        case .compressionError:
+            return "Could not compress the image to an acceptable size"
         }
     }
 }
@@ -44,10 +44,11 @@ actor NetworkService {
     // Production API URL
     private let apiURL = "https://tryon.app.juli.sh/api/tryon"
     
-    // Maximum sizes for network transmission
-    private let maxImageDimension: CGFloat = 1024 // Maximum dimension for any image
-    private let maxFileSize: Int = 4 * 1024 * 1024 // 4MB max total for both images
-    private let maxCompressionAttempts = 5 // Maximum number of compression attempts
+    // Constants for image processing
+    private let maxImageDimension: CGFloat = 1024
+    private let targetImageSize: Int = 1 * 1024 * 1024  // 1MB target size
+    private let maxImageSize: Int = 2 * 1024 * 1024     // 2MB absolute maximum
+    private let minCompressionQuality: CGFloat = 0.1    // Minimum acceptable quality
     
     func tryOnCloth(personImage: UIImage, clothImage: UIImage) async throws -> UIImage {
         do {
@@ -61,14 +62,28 @@ actor NetworkService {
             // Report memory usage
             reportMemoryUsage("Before image processing")
             
-            // Resize images to prevent excessive memory usage
-            logger.log("Resizing images if needed")
+            // Process person image
+            logger.log("Processing person image")
+            let (processedPersonImage, personImageData) = try await processImage(
+                personImage,
+                type: "person",
+                maxDimension: maxImageDimension,
+                targetSize: targetImageSize,
+                maxSize: maxImageSize
+            )
             
-            // Resize and compress images
-            let (resizedPersonImage, resizedClothImage) = try await prepareImagesForUpload(personImage, clothImage)
+            // Process clothing image
+            logger.log("Processing clothing image")
+            let (processedClothImage, clothImageData) = try await processImage(
+                clothImage,
+                type: "clothing",
+                maxDimension: maxImageDimension,
+                targetSize: targetImageSize,
+                maxSize: maxImageSize
+            )
             
-            // Report memory usage
-            reportMemoryUsage("After image preparation")
+            // Report memory usage after processing
+            reportMemoryUsage("After image processing")
             
             // Create request with timeout
             logger.log("Creating HTTP request")
@@ -80,11 +95,11 @@ actor NetworkService {
             let boundary = UUID().uuidString
             request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
             
-            // Create form data with explicit memory management
+            // Create form data
             logger.log("Creating multipart form data")
             var httpBody: Data?
             try autoreleasepool {
-                httpBody = createFormData(boundary: boundary, personData: resizedPersonImage, clothData: resizedClothImage)
+                httpBody = createFormData(boundary: boundary, personData: personImageData, clothData: clothImageData)
             }
             
             guard let requestBody = httpBody else {
@@ -98,12 +113,14 @@ actor NetworkService {
             // Report memory usage
             reportMemoryUsage("Before network request")
             
+            // Configure session
             logger.log("Configuring URLSession")
             let config = URLSessionConfiguration.default
             config.timeoutIntervalForRequest = 90
-            config.timeoutIntervalForResource = 300 // 5 minute timeout for resource
+            config.timeoutIntervalForResource = 300
             let session = URLSession(configuration: config)
             
+            // Send request
             logger.log("Sending network request to \(url.absoluteString)")
             let (data, response) = try await session.data(for: request)
             logger.log("Received response with \(data.count) bytes")
@@ -139,11 +156,8 @@ actor NetworkService {
                 return image
             } else {
                 logger.error("Server returned error status: \(httpResponse.statusCode)")
-                
-                // Try to parse error message from response
                 let errorMessage = try? JSONDecoder().decode([String: String].self, from: data)["error"] ?? "Unknown error"
                 logger.error("Error message: \(errorMessage ?? "None")")
-                
                 throw NetworkError.serverError(httpResponse.statusCode, errorMessage ?? "Unknown error")
             }
         } catch let error as NetworkError {
@@ -154,69 +168,65 @@ actor NetworkService {
             throw NetworkError.timeoutError
         } catch {
             logger.error("Unexpected error: \(error.localizedDescription)")
-            
-            // Check if error might be related to memory
             if error.localizedDescription.contains("memory") {
                 throw NetworkError.memoryError
             }
-            
             throw NetworkError.requestFailed(error)
         }
     }
     
-    // New method to prepare and compress images for upload
-    private func prepareImagesForUpload(_ personImage: UIImage, _ clothImage: UIImage) async throws -> (Data, Data) {
-        // First, resize images if they're too large
-        let resizedPersonImage = resizeImageIfNeeded(personImage, maxDimension: maxImageDimension)
-        let resizedClothImage = resizeImageIfNeeded(clothImage, maxDimension: maxImageDimension)
+    private func processImage(_ image: UIImage, type: String, maxDimension: CGFloat, targetSize: Int, maxSize: Int) async throws -> (UIImage, Data) {
+        logger.log("Processing \(type) image: \(image.size.width)x\(image.size.height)")
         
-        logger.log("Images resized - Person: \(resizedPersonImage.size.width)x\(resizedPersonImage.size.height), Cloth: \(resizedClothImage.size.width)x\(resizedClothImage.size.height)")
+        // First resize if needed
+        let resizedImage = resizeImageIfNeeded(image, maxDimension: maxDimension)
+        logger.log("\(type) image resized to: \(resizedImage.size.width)x\(resizedImage.size.height)")
         
-        // Compress with increasing compression until total size is acceptable
-        var compressionQuality: CGFloat = 0.7
-        var personData: Data?
-        var clothData: Data?
-        var attempts = 0
+        // Try to compress to target size
+        let imageData = try await compressImage(resizedImage, type: type, targetSize: targetSize, maxSize: maxSize)
+        logger.log("\(type) image compressed to \(imageData.count) bytes")
         
-        // Keep attempting compression until we're below the max size or reach max attempts
-        while attempts < maxCompressionAttempts {
-            try autoreleasepool {
-                personData = resizedPersonImage.jpegData(compressionQuality: compressionQuality)
-                clothData = resizedClothImage.jpegData(compressionQuality: compressionQuality)
+        return (resizedImage, imageData)
+    }
+    
+    private func compressImage(_ image: UIImage, type: String, targetSize: Int, maxSize: Int) async throws -> Data {
+        var compressionQuality: CGFloat = 0.8
+        var imageData: Data
+        
+        // Try progressively lower quality until we get under target size
+        repeat {
+            guard let data = image.jpegData(compressionQuality: compressionQuality) else {
+                logger.error("Failed to compress \(type) image at quality \(compressionQuality)")
+                throw NetworkError.compressionError
             }
             
-            guard let personImageData = personData, let clothImageData = clothData else {
-                logger.error("Failed to convert images to data")
-                throw NetworkError.noData
+            imageData = data
+            
+            if imageData.count <= targetSize {
+                logger.log("\(type) image compressed successfully at quality \(compressionQuality)")
+                break
             }
             
-            let totalSize = personImageData.count + clothImageData.count
-            logger.log("Compression attempt \(attempts+1): quality=\(compressionQuality), person=\(personImageData.count/1024)KB, cloth=\(clothImageData.count/1024)KB, total=\(totalSize/1024)KB")
+            compressionQuality -= 0.1
+            logger.log("Retrying \(type) image compression at quality \(compressionQuality)")
             
-            if totalSize <= maxFileSize {
-                logger.log("Acceptable compression achieved")
-                return (personImageData, clothImageData)
+            // Check if we've hit minimum quality
+            if compressionQuality < minCompressionQuality {
+                if imageData.count <= maxSize {
+                    logger.warning("\(type) image couldn't reach target size, but is under max size")
+                    break
+                } else {
+                    logger.error("\(type) image too large even at minimum quality")
+                    throw NetworkError.compressionError
+                }
             }
             
-            // Reduce quality for next attempt
-            compressionQuality -= 0.15
-            if compressionQuality < 0.3 {
-                compressionQuality = 0.3 // Don't go below 0.3 quality
-            }
+            // Allow other tasks to proceed
+            await Task.yield()
             
-            attempts += 1
-        }
+        } while true
         
-        // If we get here and have data but it's still too large, use the last compression result
-        if let personImageData = personData, let clothImageData = clothData {
-            let totalSize = personImageData.count + clothImageData.count
-            logger.warning("Images still large after compression: \(totalSize/1024)KB, proceeding anyway")
-            return (personImageData, clothImageData)
-        }
-        
-        // If we couldn't get any data at all
-        logger.error("Failed to compress images to an acceptable size")
-        throw NetworkError.imageTooLarge
+        return imageData
     }
     
     private func createFormData(boundary: String, personData: Data, clothData: Data) -> Data {
@@ -246,20 +256,15 @@ actor NetworkService {
         return body
     }
     
-    // Helper function to resize images if they're too large
     private func resizeImageIfNeeded(_ image: UIImage, maxDimension: CGFloat) -> UIImage {
         let originalSize = image.size
-        
-        // Log original image details
         logger.log("Original image size: \(originalSize.width)x\(originalSize.height)")
         
-        // If image is already smaller than max dimension, return it as is
         if originalSize.width <= maxDimension && originalSize.height <= maxDimension {
             logger.log("Image already within size limits, no resize needed")
             return image
         }
         
-        // Calculate new size while maintaining aspect ratio
         var newSize: CGSize
         if originalSize.width > originalSize.height {
             let ratio = maxDimension / originalSize.width
@@ -271,19 +276,15 @@ actor NetworkService {
         
         logger.log("Resizing to: \(newSize.width)x\(newSize.height)")
         
-        // Perform resize with more explicit memory management
         var resizedImage: UIImage?
-        
         autoreleasepool {
             UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
+            defer { UIGraphicsEndImageContext() }
             
             image.draw(in: CGRect(origin: .zero, size: newSize))
             resizedImage = UIGraphicsGetImageFromCurrentImageContext()
-            
-            UIGraphicsEndImageContext()
         }
         
-        // If resize failed, log and return original
         guard let result = resizedImage else {
             logger.error("Image resize failed")
             return image
@@ -293,7 +294,6 @@ actor NetworkService {
         return result
     }
     
-    // Helper function to report memory usage
     private func reportMemoryUsage(_ context: String) {
         var info = mach_task_basic_info()
         var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size)/4
