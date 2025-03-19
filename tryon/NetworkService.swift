@@ -33,7 +33,7 @@ enum NetworkError: Error {
 
 actor NetworkService {
     private let logger = Logger(subsystem: "com.juli.tryon", category: "NetworkService")
-    private let apiURL = "http://localhost:8787/api/tryon"
+    private let apiURL = "https://tryon.app.juli.sh/api/tryon"
     
     func tryOnCloth(personImage: UIImage, clothImage: UIImage) async throws -> UIImage {
         guard let url = URL(string: apiURL) else {
@@ -48,7 +48,7 @@ actor NetworkService {
             throw NetworkError.encodingError
         }
         
-        // Create request body
+        // Create request body with safety settings disabled
         let requestBody: [String: Any] = [
             "person": [
                 "data": personBase64,
@@ -57,6 +57,12 @@ actor NetworkService {
             "clothing": [
                 "data": clothBase64,
                 "mime_type": "image/jpeg"
+            ],
+            "safetySettings": [
+                ["category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"],
+                ["category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"],
+                ["category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"],
+                ["category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"]
             ]
         ]
         
