@@ -1,64 +1,125 @@
 import Foundation
 import SwiftUI
+import os.log
 
 // Actor to handle the try-on service with thread safety
 actor TryOnService {
     private var history: [TryOnResult] = []
+    private let networkService = NetworkService()
+    private let logger = Logger(subsystem: "com.juli.tryon", category: "TryOnService")
     
-    // Mock function to simulate sending images to backend
+    // Constants for image processing
+    private let maxDimension: CGFloat = 1024
+    private let targetFileSize: Int = 1 * 1024 * 1024  // 1MB target
+    private let maxFileSize: Int = 2 * 1024 * 1024     // 2MB max
+    
     func tryOnCloth(personImage: UIImage, clothImage: UIImage) async throws -> TryOnResult {
-        // Simulate network delay
-        try await Task.sleep(for: .seconds(2))
+        logger.log("Processing images before sending to API")
         
-        // In a real app, this would send the images to a backend service
-        // and receive a processed image back. For now, we'll mock it.
+        // Process person image
+        let processedPersonImage = try await processImage(personImage, type: "person")
+        logger.log("Person image processed: \(processedPersonImage.size.width)x\(processedPersonImage.size.height)")
         
-        // Mock result - in a real app this would be the returned image from backend
-        let mockResultImage = await mockMergeImages(personImage: personImage, clothImage: clothImage)
+        // Process clothing image
+        let processedClothImage = try await processImage(clothImage, type: "clothing")
+        logger.log("Clothing image processed: \(processedClothImage.size.width)x\(processedClothImage.size.height)")
         
+        // Call the real API with processed images
+        let resultImage = try await networkService.tryOnCloth(
+            personImage: processedPersonImage,
+            clothImage: processedClothImage
+        )
+        
+        // Create result with real API response
         let result = TryOnResult(
             id: UUID(),
-            personImage: personImage,
-            clothImage: clothImage,
-            resultImage: mockResultImage,
+            personImage: personImage,        // Keep original for history
+            clothImage: clothImage,          // Keep original for history
+            resultImage: resultImage,
             timestamp: Date()
         )
         
         // Add to history
         history.append(result)
         
+        // Keep only the last 20 items to prevent memory growth
+        if history.count > 20 {
+            history = Array(history.suffix(20))
+        }
+        
         return result
+    }
+    
+    private func processImage(_ image: UIImage, type: String) async throws -> UIImage {
+        logger.log("Processing \(type) image of size: \(image.size.width)x\(image.size.height)")
+        
+        // First check if we need to resize
+        let resizedImage = resizeImageIfNeeded(image)
+        
+        // Then check if we need to compress
+        if let imageData = resizedImage.jpegData(compressionQuality: 1.0),
+           imageData.count > targetFileSize {
+            logger.log("\(type) image needs compression, current size: \(imageData.count/1024)KB")
+            
+            // Try progressive compression
+            var quality: CGFloat = 0.8
+            while quality >= 0.1 {
+                if let compressedData = resizedImage.jpegData(compressionQuality: quality),
+                   let compressedImage = UIImage(data: compressedData) {
+                    if compressedData.count <= targetFileSize {
+                        logger.log("\(type) image compressed successfully at quality \(quality), final size: \(compressedData.count/1024)KB")
+                        return compressedImage
+                    } else if compressedData.count <= maxFileSize && quality <= 0.2 {
+                        // Accept slightly larger size if we're already at low quality
+                        logger.log("\(type) image compressed to acceptable size at quality \(quality), final size: \(compressedData.count/1024)KB")
+                        return compressedImage
+                    }
+                }
+                quality -= 0.1
+                await Task.yield() // Allow other tasks to proceed
+            }
+            
+            logger.error("Could not compress \(type) image to acceptable size")
+            throw NetworkError.compressionError
+        }
+        
+        return resizedImage
+    }
+    
+    private func resizeImageIfNeeded(_ image: UIImage) -> UIImage {
+        let size = image.size
+        
+        if size.width <= maxDimension && size.height <= maxDimension {
+            logger.log("Image already within size limits: \(size.width)x\(size.height)")
+            return image
+        }
+        
+        var newSize: CGSize
+        if size.width > size.height {
+            let ratio = maxDimension / size.width
+            newSize = CGSize(width: maxDimension, height: size.height * ratio)
+        } else {
+            let ratio = maxDimension / size.height
+            newSize = CGSize(width: size.width * ratio, height: maxDimension)
+        }
+        
+        logger.log("Resizing image from \(size.width)x\(size.height) to \(newSize.width)x\(newSize.height)")
+        
+        var resizedImage: UIImage?
+        autoreleasepool {
+            UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
+            defer { UIGraphicsEndImageContext() }
+            
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+            resizedImage = UIGraphicsGetImageFromCurrentImageContext()
+        }
+        
+        return resizedImage ?? image
     }
     
     // Get all history items
     func getHistory() async -> [TryOnResult] {
         return history
-    }
-    
-    // Mock function to merge images (this would be done by the backend in reality)
-    private func mockMergeImages(personImage: UIImage, clothImage: UIImage) async -> UIImage {
-        // This is a very simplified mock that just composites the images
-        // In reality, this would be a complex AI process on the backend
-        
-        let size = CGSize(width: personImage.size.width, height: personImage.size.height)
-        
-        let renderer = UIGraphicsImageRenderer(size: size)
-        let resultImage = renderer.image { ctx in
-            // Draw person image first
-            personImage.draw(in: CGRect(origin: .zero, size: size))
-            
-            // Draw cloth image on top with some transparency
-            // In a real app, the backend would handle proper alignment and fitting
-            let clothRect = CGRect(
-                x: size.width * 0.2,
-                y: size.height * 0.3,
-                width: size.width * 0.6,
-                height: size.height * 0.4
-            )
-            clothImage.draw(in: clothRect, blendMode: .normal, alpha: 0.85)
-        }
-        
-        return resultImage
     }
     
     // Clear history

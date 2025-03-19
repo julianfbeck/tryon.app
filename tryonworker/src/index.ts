@@ -130,6 +130,22 @@ app.get('/', async (c) => {
   `)
 })
 
+// Function to convert ArrayBuffer to base64 without call stack issues
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunkSize = 1024;
+  
+  // Process in chunks to avoid call stack size exceeded
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.slice(i, i + chunkSize);
+    const array = Array.from(chunk);
+    binary += String.fromCharCode.apply(null, array);
+  }
+  
+  return btoa(binary);
+}
+
 // API endpoint for try-on
 app.post('/api/tryon', async (c) => {
   try {
@@ -158,8 +174,9 @@ app.post('/api/tryon', async (c) => {
       clothingBufferSize: clothingBuffer.byteLength
     })
 
-    const personBase64 = btoa(String.fromCharCode(...new Uint8Array(personBuffer)))
-    const clothingBase64 = btoa(String.fromCharCode(...new Uint8Array(clothingBuffer)))
+    // Use the safer chunking method for base64 conversion
+    const personBase64 = arrayBufferToBase64(personBuffer);
+    const clothingBase64 = arrayBufferToBase64(clothingBuffer);
 
     console.log('Converted buffers to base64:', {
       personBase64Length: personBase64.length,
