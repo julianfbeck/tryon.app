@@ -15,7 +15,6 @@ struct AppError: Identifiable {
     
     init(error: Error) {
         self.title = "Error"
-        
         if let networkError = error as? NetworkError {
             self.message = networkError.localizedDescription
         } else {
@@ -32,10 +31,6 @@ class TryOnViewModel: ObservableObject {
     
     // Logger instance
     private let logger = Logger(subsystem: "com.juli.tryon", category: "TryOnViewModel")
-    
-    // Image size limits
-    private let maxImageDimension: CGFloat = 2048
-    private let maxFileSize: Int = 10 * 1024 * 1024 // 10MB
     
     // Published properties for UI updates
     @Published var personImage: UIImage?
@@ -82,65 +77,13 @@ class TryOnViewModel: ObservableObject {
         logger.log("History loaded: \(self.historyItems.count) items")
     }
     
-    // Validate images before processing
-    private func validateImages(_ personImage: UIImage, _ clothImage: UIImage) -> Bool {
-        logger.log("Validating images - Person: \(personImage.size.width)x\(personImage.size.height), Cloth: \(clothImage.size.width)x\(clothImage.size.height)")
-        
-        // Check for zero size images
-        if personImage.size.width <= 0 || personImage.size.height <= 0 {
-            logger.error("Person image has invalid dimensions")
-            showError(title: "Invalid Image", message: "The person image has invalid dimensions")
-            return false
-        }
-        
-        if clothImage.size.width <= 0 || clothImage.size.height <= 0 {
-            logger.error("Clothing image has invalid dimensions")
-            showError(title: "Invalid Image", message: "The clothing image has invalid dimensions")
-            return false
-        }
-        
-        // Check for extremely large images
-        if personImage.size.width > maxImageDimension || personImage.size.height > maxImageDimension {
-            logger.warning("Person image is very large: \(personImage.size.width)x\(personImage.size.height)")
-        }
-        
-        if clothImage.size.width > maxImageDimension || clothImage.size.height > maxImageDimension {
-            logger.warning("Clothing image is very large: \(clothImage.size.width)x\(clothImage.size.height)")
-        }
-        
-        // Estimate file size (rough approximation)
-        let estimatedPersonSize = Int(personImage.size.width * personImage.size.height * 4) // 4 bytes per pixel (RGBA)
-        let estimatedClothSize = Int(clothImage.size.width * clothImage.size.height * 4)
-        
-        logger.log("Estimated sizes - Person: \(estimatedPersonSize/1024) KB, Cloth: \(estimatedClothSize/1024) KB")
-        
-        if estimatedPersonSize > maxFileSize {
-            logger.error("Person image is too large (\(estimatedPersonSize/1024/1024) MB)")
-            showError(title: "Image Too Large", message: "The person image is too large. Please select a smaller image.")
-            return false
-        }
-        
-        if estimatedClothSize > maxFileSize {
-            logger.error("Clothing image is too large (\(estimatedClothSize/1024/1024) MB)")
-            showError(title: "Image Too Large", message: "The clothing image is too large. Please select a smaller image.")
-            return false
-        }
-        
-        return true
-    }
-    
     // Try on function
     func tryOnCloth() async {
         logger.log("tryOnCloth called")
         
         guard let personImage = personImage, let clothImage = clothImage else {
             logger.error("Missing images for try-on")
-            showError(title: "Missing Images", message: "Please select both a person image and a clothing item")
-            return
-        }
-        
-        // Validate images before proceeding
-        if !validateImages(personImage, clothImage) {
+            showError(message: "Please select both a person image and a clothing item")
             return
         }
         
@@ -149,63 +92,26 @@ class TryOnViewModel: ObservableObject {
         logger.log("Starting try-on process")
         
         do {
-            // Use Task with priority to ensure we don't block the main thread
-            let result = try await Task.detached(priority: .userInitiated) {
-                return try await self.tryOnService.tryOnCloth(personImage: personImage, clothImage: clothImage)
-            }.value
-            
-            logger.log("Try-on completed successfully")
+            let result = try await tryOnService.tryOnCloth(personImage: personImage, clothImage: clothImage)
             resultImage = result.resultImage
             await loadHistory()
-            
-            // Signal that result processing is complete
             resultProcessed = true
-        } catch let error as NetworkError {
-            logger.error("Network error during try-on: \(error.localizedDescription)")
-            handleNetworkError(error)
         } catch {
-            logger.error("Unexpected error during try-on: \(error.localizedDescription)")
-            showSystemError(error)
+            showError(error: error)
         }
         
         isLoading = false
         logger.log("Try-on process finished")
     }
     
-    // Handle specific network errors
-    private func handleNetworkError(_ error: NetworkError) {
-        logger.log("Handling network error: \(error.localizedDescription)")
-        switch error {
-        case .serverError(let code, let message):
-            showError(title: "Server Error (\(code))", message: message)
-        case .invalidURL:
-            showError(title: "Configuration Error", message: "Invalid API URL. Please check your network settings.")
-        case .noData:
-            showError(title: "Image Error", message: "Could not process the selected images.")
-        case .invalidResponse, .decodingError:
-            showError(title: "Processing Error", message: "The server returned an invalid response. Please try again.")
-        case .requestFailed(let underlyingError):
-            showError(title: "Network Error", message: "Could not communicate with the server: \(underlyingError.localizedDescription)")
-        case .timeoutError:
-            showError(title: "Timeout Error", message: "The server took too long to respond. Please try again later or with smaller images.")
-        case .memoryError:
-            showError(title: "Memory Error", message: "Not enough memory to process these images. Try using smaller images.")
-        case .compressionError:
-            showError(title: "Compression Error", message: "Failed to compress the images. Please try again.")
-        }
-    }
-    
-    public func showError(title: String = "Error", message: String) {
+    func showError(title: String = "Error", message: String) {
         logger.error("\(title): \(message)")
         errorMessage = message
         appError = AppError(title: title, message: message)
         showingAlert = true
     }
     
-    // Show error from a system Error object
-    private func showSystemError(_ error: Error) {
-        logger.error("Error: \(error.localizedDescription)")
-        errorMessage = error.localizedDescription
+    func showError(error: Error) {
         appError = AppError(error: error)
         showingAlert = true
     }

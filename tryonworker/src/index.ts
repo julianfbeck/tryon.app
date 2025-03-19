@@ -5,6 +5,29 @@ interface Env {
   GOOGLE_API_KEY: string;
 }
 
+interface ImageData {
+  data: string;
+  mime_type: string;
+}
+
+interface RequestBody {
+  person: ImageData;
+  clothing: ImageData;
+}
+
+interface GeminiResponse {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        inlineData?: {
+          data: string;
+        };
+      }>;
+    };
+  }>;
+  promptFeedback?: any;
+}
+
 const app = new Hono<{ Bindings: Env }>()
 
 app.use('/static/*', serveStatic({ root: './', manifest: {} }))
@@ -130,57 +153,25 @@ app.get('/', async (c) => {
   `)
 })
 
-// Function to convert ArrayBuffer to base64 without call stack issues
-function arrayBufferToBase64(buffer) {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  const chunkSize = 1024;
-  
-  // Process in chunks to avoid call stack size exceeded
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.slice(i, i + chunkSize);
-    const array = Array.from(chunk);
-    binary += String.fromCharCode.apply(null, array);
-  }
-  
-  return btoa(binary);
-}
-
 // API endpoint for try-on
 app.post('/api/tryon', async (c) => {
   try {
-    const formData = await c.req.formData()
-    const personImage = formData.get('person') as File
-    const clothingImage = formData.get('clothing') as File
+    const body = await c.req.json<RequestBody>()
+    const { person, clothing } = body
 
-    if (!personImage || !clothingImage) {
-      console.error('Missing required images:', { person: !!personImage, clothing: !!clothingImage })
+    if (!person?.data || !clothing?.data) {
+      console.error('Missing required images:', {
+        hasPerson: !!person?.data,
+        hasClothing: !!clothing?.data
+      })
       throw new Error('Both person and clothing images are required')
     }
 
     console.log('Processing images:', {
-      personType: personImage.type,
-      personSize: personImage.size,
-      clothingType: clothingImage.type,
-      clothingSize: clothingImage.size
-    })
-
-    // Convert images to base64
-    const personBuffer = await personImage.arrayBuffer()
-    const clothingBuffer = await clothingImage.arrayBuffer()
-
-    console.log('Converted images to buffers:', {
-      personBufferSize: personBuffer.byteLength,
-      clothingBufferSize: clothingBuffer.byteLength
-    })
-
-    // Use the safer chunking method for base64 conversion
-    const personBase64 = arrayBufferToBase64(personBuffer);
-    const clothingBase64 = arrayBufferToBase64(clothingBuffer);
-
-    console.log('Converted buffers to base64:', {
-      personBase64Length: personBase64.length,
-      clothingBase64Length: clothingBase64.length
+      personType: person.mime_type,
+      personDataLength: person.data.length,
+      clothingType: clothing.mime_type,
+      clothingDataLength: clothing.data.length
     })
 
     // Prepare the request for Gemini API
@@ -193,8 +184,8 @@ app.post('/api/tryon', async (c) => {
           },
           {
             inline_data: {
-              mime_type: personImage.type,
-              data: personBase64
+              mime_type: person.mime_type,
+              data: person.data
             }
           }
         ]
@@ -215,8 +206,8 @@ app.post('/api/tryon', async (c) => {
           },
           {
             inline_data: {
-              mime_type: clothingImage.type,
-              data: clothingBase64
+              mime_type: clothing.mime_type,
+              data: clothing.data
             }
           }
         ]
@@ -266,48 +257,41 @@ app.post('/api/tryon', async (c) => {
         statusText: response.statusText,
         error: errorText
       })
-      throw new Error(`Failed to generate image: ${response.status} ${response.statusText} `)
+      throw new Error(`Failed to generate image: ${response.status} ${response.statusText}`)
     }
 
     console.log('Successfully received response from Gemini API')
+    const data = await response.json()
 
-    // Log the full response
-    const responseText = await response.text()
-    console.log('Raw API Response:', responseText)
+    console.log(data)
+    console.log(JSON.stringify(data, null, 4));
+    const responseData = data as GeminiResponse
+    console.log('Parsed API Response:', {
+      candidates: responseData.candidates,
+      promptFeedback: responseData.promptFeedback
+    })
 
-    try {
-      // Parse the response to get the image data
-      const responseData = JSON.parse(responseText)
-      console.log('Parsed API Response:', {
-        candidates: responseData.candidates,
-        promptFeedback: responseData.promptFeedback
+    // Check if we have image data in the response
+    if (responseData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data) {
+      const base64Image = responseData.candidates[0].content.parts[0].inlineData.data
+      const binaryData = atob(base64Image)
+      const uint8Array = new Uint8Array(binaryData.length)
+      for (let i = 0; i < binaryData.length; i++) {
+        uint8Array[i] = binaryData.charCodeAt(i)
+      }
+
+      const blob = new Blob([uint8Array], { type: 'image/png' })
+      console.log('Created image blob:', {
+        size: blob.size,
+        type: blob.type
       })
 
-      // Check if we have image data in the response
-      if (responseData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data) {
-        const base64Image = responseData.candidates[0].content.parts[0].inlineData.data
-        const binaryData = atob(base64Image)
-        const uint8Array = new Uint8Array(binaryData.length)
-        for (let i = 0; i < binaryData.length; i++) {
-          uint8Array[i] = binaryData.charCodeAt(i)
-        }
-
-        const blob = new Blob([uint8Array], { type: 'image/png' })
-        console.log('Created image blob:', {
-          size: blob.size,
-          type: blob.type
-        })
-
-        return new Response(blob, {
-          headers: { 'Content-Type': 'image/png' }
-        })
-      } else {
-        console.error('No image data found in response')
-        throw new Error('No image data in response')
-      }
-    } catch (parseError) {
-      console.error('Error parsing response:', parseError)
-      throw new Error('Failed to parse API response')
+      return new Response(blob, {
+        headers: { 'Content-Type': 'image/png' }
+      })
+    } else {
+      console.error('No image data found in response')
+      throw new Error('No image data in response')
     }
   } catch (error: any) {
     console.error('Error in /api/tryon:', {
