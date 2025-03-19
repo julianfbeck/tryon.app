@@ -1,6 +1,5 @@
 import { Hono } from 'hono'
 import { serveStatic } from 'hono/cloudflare-workers'
-import { cors } from 'hono/cors'
 
 interface Env {
   GOOGLE_API_KEY: string;

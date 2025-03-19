@@ -1,10 +1,12 @@
 import SwiftUI
+import os.log
 
 struct TryOnView: View {
     @EnvironmentObject var viewModel: TryOnViewModel
     @State private var showingPersonImagePicker = false
     @State private var showingClothImagePicker = false
     @State private var showingResultSheet = false
+    private let logger = Logger(subsystem: "com.juli.tryon", category: "TryOnView")
     
     var body: some View {
         NavigationStack {
@@ -25,6 +27,7 @@ struct TryOnView: View {
                             isSelected: viewModel.isPersonImageSelected,
                             selectedImage: viewModel.personImage
                         ) {
+                            logger.log("Opening person image picker")
                             showingPersonImagePicker = true
                         }
                         
@@ -36,6 +39,7 @@ struct TryOnView: View {
                             isSelected: viewModel.isClothImageSelected,
                             selectedImage: viewModel.clothImage
                         ) {
+                            logger.log("Opening clothing image picker")
                             showingClothImagePicker = true
                         }
                     }
@@ -83,14 +87,30 @@ struct TryOnView: View {
                         .padding(.horizontal)
                     }
                     
+                    // Memory usage tip if we've had errors
+                    if viewModel.errorMessage != nil {
+                        HStack {
+                            Image(systemName: "lightbulb.fill")
+                                .foregroundColor(.yellow)
+                            Text("Tip: Try using smaller photos or clearing the app from memory if you experience issues.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding()
+                        .background(Color.yellow.opacity(0.1))
+                        .cornerRadius(Constants.cornerRadius)
+                        .padding(.horizontal)
+                    }
+                    
                     // Action buttons side by side
                     HStack(spacing: Constants.spacing) {
                         // Try On button
                         Button {
+                            logger.log("Try On button tapped")
                             Task {
                                 await viewModel.tryOnCloth()
-                                // When processing completes, show result sheet
                                 if viewModel.resultImage != nil && !viewModel.isLoading {
+                                    logger.log("Show result sheet after successful try-on")
                                     showingResultSheet = true
                                 }
                             }
@@ -115,6 +135,7 @@ struct TryOnView: View {
                         
                         // Reset button
                         Button {
+                            logger.log("Reset button tapped")
                             viewModel.resetSelections()
                         } label: {
                             Text("Reset")
@@ -137,10 +158,16 @@ struct TryOnView: View {
             }
             .navigationTitle("Try On")
             .sheet(isPresented: $showingPersonImagePicker) {
-                ImagePicker(image: $viewModel.personImage)
+                ImagePicker(image: $viewModel.personImage, onError: { errorMessage in
+                    logger.error("Person image picker error: \(errorMessage)")
+                    viewModel.showError(title: "Image Error", message: errorMessage)
+                })
             }
             .sheet(isPresented: $showingClothImagePicker) {
-                ImagePicker(image: $viewModel.clothImage)
+                ImagePicker(image: $viewModel.clothImage, onError: { errorMessage in
+                    logger.error("Clothing image picker error: \(errorMessage)")
+                    viewModel.showError(title: "Image Error", message: errorMessage)
+                })
             }
             .sheet(isPresented: $showingResultSheet) {
                 if let resultImage = viewModel.resultImage {
@@ -149,6 +176,7 @@ struct TryOnView: View {
             }
             .onChange(of: viewModel.resultProcessed) { _, newValue in
                 if newValue {
+                    logger.log("Result processed, showing result sheet")
                     showingResultSheet = true
                     viewModel.resultProcessed = false
                 }
@@ -163,6 +191,28 @@ struct TryOnView: View {
                 }
             } message: { error in
                 Text(error.message)
+            }
+            .onAppear {
+                logger.log("TryOnView appeared")
+            }
+            .onDisappear {
+                logger.log("TryOnView disappeared")
+            }
+            // Special debug button that will appear only if there are errors
+            .overlay(alignment: .bottomTrailing) {
+                if viewModel.errorMessage != nil {
+                    Button {
+                        logger.log("Debug button tapped")
+                        viewModel.debugCallStack()
+                        viewModel.checkForPerformanceIssues()
+                    } label: {
+                        Image(systemName: "ladybug")
+                            .foregroundColor(.white)
+                            .padding(8)
+                            .background(Circle().fill(Color.gray.opacity(0.8)))
+                            .padding(16)
+                    }
+                }
             }
         }
     }
@@ -214,6 +264,15 @@ struct TryOnView: View {
                     .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
             )
         }
+    }
+}
+
+extension TryOnViewModel {
+    // Add a public function for showing errors from the view
+    func showError(title: String, message: String) {
+        errorMessage = message
+        appError = AppError(title: title, message: message)
+        showingAlert = true
     }
 }
 
