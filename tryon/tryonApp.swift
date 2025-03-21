@@ -12,7 +12,7 @@ struct tryonApp: App {
     @StateObject var globalViewModel = GlobalViewModel()
     
     init() {
-           Purchases.configure(withAPIKey: "appl_DSixzxLRXMARuHqtoBOIvAxjXUd")
+           Purchases.configure(withAPIKey: "appl_KIgdiugXJfhqQJjnhXZnVapWakD")
        }
     
     var body: some Scene {
