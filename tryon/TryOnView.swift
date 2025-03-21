@@ -48,7 +48,7 @@ struct TryOnView: View {
                                 .foregroundColor(.secondary)
                                 .multilineTextAlignment(.center)
                             
-                            // Horizontal scroll for previous person photos
+                            // Horizontal scroll for person photos (including selected image)
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: Constants.spacing) {
                                     // Add new photo button
@@ -70,8 +70,36 @@ struct TryOnView: View {
                                         }
                                     }
                                     
-                                    // Previous photos from history
-                                    ForEach(viewModel.historyItems.filter { $0.personImage != nil }, id: \.id) { item in
+                                    // Current selected image (if any)
+                                    if let selectedImage = viewModel.personImage {
+                                        Button(action: {
+                                            logger.log("Opening person image picker to replace current")
+                                            showingPersonImagePicker = true
+                                        }) {
+                                            VStack {
+                                                Image(uiImage: selectedImage)
+                                                    .resizable()
+                                                    .scaledToFill()
+                                                    .frame(width: 100, height: 150)
+                                                    .clipped()
+                                                    .cornerRadius(Constants.cornerRadius)
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: Constants.cornerRadius)
+                                                            .stroke(Color.accentColor, lineWidth: 3)
+                                                    )
+                                                
+                                                Text("Current")
+                                                    .font(.caption)
+                                                    .foregroundColor(.primary)
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Previous photos from history (newest first)
+                                    ForEach(viewModel.historyItems.filter {
+                                        $0.personImage != nil &&
+                                        $0.personImage.pngData() != viewModel.personImage?.pngData()
+                                    }.reversed(), id: \.id) { item in
                                         Button(action: {
                                             logger.log("Selected person image from history")
                                             viewModel.setPersonImage(item.personImage)
@@ -83,10 +111,6 @@ struct TryOnView: View {
                                                     .frame(width: 100, height: 150)
                                                     .clipped()
                                                     .cornerRadius(Constants.cornerRadius)
-                                                    .overlay(
-                                                        RoundedRectangle(cornerRadius: Constants.cornerRadius)
-                                                            .stroke(viewModel.personImage?.pngData() == item.personImage.pngData() ? Color.accentColor : Color.clear, lineWidth: 3)
-                                                    )
                                                 
                                                 Text("Photo \(viewModel.historyItems.firstIndex(where: { $0.id == item.id })?.advanced(by: 1) ?? 0)")
                                                     .font(.caption)
@@ -97,21 +121,6 @@ struct TryOnView: View {
                                 }
                                 .padding(.horizontal)
                                 .padding(.vertical, 8)
-                            }
-                            
-                            // Currently selected image preview (larger)
-                            if let selectedImage = viewModel.personImage {
-                                Image(uiImage: selectedImage)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(height: 250)
-                                    .cornerRadius(Constants.cornerRadius)
-                                    .padding(.top, 8)
-                                
-                                Text("Tap to change")
-                                    .font(.caption)
-                                    .foregroundColor(.accentColor)
-                                    .padding(.top, 4)
                             }
                         }
                         .padding()
@@ -131,17 +140,7 @@ struct TryOnView: View {
                         }
                     }
                     
-                    // Result area
-                    if viewModel.isLoading {
-                        VStack {
-                            ProgressView()
-                                .padding()
-                            Text("Processing your try-on request...")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                        .frame(height: 200)
-                    } else if let resultImage = viewModel.resultImage {
+                 let resultImage = viewModel.resultImage {
                         VStack {
                             Text("Try-On Result")
                                 .font(.headline)
@@ -357,4 +356,4 @@ struct TryOnView: View {
     TryOnView()
         .environmentObject(TryOnViewModel())
         .environmentObject(GlobalViewModel())
-} 
+}
