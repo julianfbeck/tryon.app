@@ -6,12 +6,21 @@
 //
 
 import SwiftUI
-
+import RevenueCat
 @main
 struct tryonApp: App {
+    @StateObject var globalViewModel = GlobalViewModel()
+    
+    init() {
+           Purchases.configure(withAPIKey: "appl_DSixzxLRXMARuHqtoBOIvAxjXUd")
+       }
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView().environmentObject(globalViewModel)
+                .onAppear {
+                    Plausible.shared.configure(domain: "tryon.juli.sh", endpoint: "https://stats.juli.sh/api/event")
+                }
         }
     }
 }

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		9AD349062D8C08F600F295BF /* SwiftUIImageViewer in Frameworks */ = {isa = PBXBuildFile; productRef = 9AD349052D8C08F600F295BF /* SwiftUIImageViewer */; };
+		9AD3491B2D8D9B8800F295BF /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 9AD3491A2D8D9B8800F295BF /* RevenueCat */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,6 +28,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9AD3491B2D8D9B8800F295BF /* RevenueCat in Frameworks */,
 				9AD349062D8C08F600F295BF /* SwiftUIImageViewer in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -71,6 +73,7 @@
 			name = tryon;
 			packageProductDependencies = (
 				9AD349052D8C08F600F295BF /* SwiftUIImageViewer */,
+				9AD3491A2D8D9B8800F295BF /* RevenueCat */,
 			);
 			productName = tryon;
 			productReference = 9A0CB71F2D889E1900FD0F36 /* tryon.app */;
@@ -102,6 +105,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				9AD349042D8C08F600F295BF /* XCRemoteSwiftPackageReference "swiftui-image-viewer" */,
+				9AD349192D8D9B8800F295BF /* XCRemoteSwiftPackageReference "purchases-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9A0CB7202D889E1900FD0F36 /* Products */;
@@ -343,6 +347,14 @@
 				minimumVersion = 1.0.0;
 			};
 		};
+		9AD349192D8D9B8800F295BF /* XCRemoteSwiftPackageReference "purchases-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RevenueCat/purchases-ios/";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.20.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -350,6 +362,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 9AD349042D8C08F600F295BF /* XCRemoteSwiftPackageReference "swiftui-image-viewer" */;
 			productName = SwiftUIImageViewer;
+		};
+		9AD3491A2D8D9B8800F295BF /* RevenueCat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9AD349192D8D9B8800F295BF /* XCRemoteSwiftPackageReference "purchases-ios" */;
+			productName = RevenueCat;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
