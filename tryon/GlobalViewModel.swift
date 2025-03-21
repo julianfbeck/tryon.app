@@ -21,7 +21,11 @@ class GlobalViewModel: ObservableObject {
     @Published var isPurchasing = false
     @Published var errorMessage: String?
     @Published var isShowingPayWall = false
-    @Published var isShowingRatingView = false
+    @Published var isShowingOnboarding: Bool {
+        didSet {
+            UserDefaults.standard.set(!isShowingOnboarding, forKey: "hasSeenOnboarding")
+        }
+    }
     @Published var remainingUses: Int
     @Published var canUseForFree: Bool
     @Published var downloadCount: Int {
@@ -63,9 +67,9 @@ class GlobalViewModel: ObservableObject {
     @Published var lastResultID: UUID?
     
     private let maxUsageCount: Int = 3
-    private let featureKey = "finalUsageCountforReal!11"
-    private let baseDailyLimit: Int = 3
-    private let maxDailyLimit: Int = 10
+    private let featureKey = "finalUsageCountforReal"
+    private let baseDailyLimit: Int = 100
+    private let maxDailyLimit: Int = 100
     private let sentimentThreshold: Double = 4.0
     let maxDownlaods: Int = 3
     
@@ -73,6 +77,9 @@ class GlobalViewModel: ObservableObject {
         // Initialize all properties first
         self.isPro = UserDefaults.standard.bool(forKey: "isPro")
         self.downloadCount = UserDefaults.standard.integer(forKey: "downloadCount")
+        
+        // Check if the user has seen the onboarding
+        self.isShowingOnboarding = !UserDefaults.standard.bool(forKey: "hasSeenOnboarding")
         
         let currentUsage = PersistentUserDefaults.shared.integer(forKey: featureKey)
         self.remainingUses = max(0, maxUsageCount - currentUsage)

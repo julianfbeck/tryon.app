@@ -179,50 +179,37 @@ app.post('/api/tryon', async (c) => {
       contents: [{
         role: "user",
         parts: [
-          {
-            text: "This is a picture of me"
-          },
+
           {
             inline_data: {
               mime_type: person.mime_type,
               data: person.data
             }
-          }
-        ]
-      },
-      {
-        role: "model",
-        parts: [
-          {
-            text: "I understand this is a picture of you. What would you like me to do with it?"
-          }
-        ]
-      },
-      {
-        role: "user",
-        parts: [
-          {
-            text: "Here is the clothing item I want to try on"
           },
           {
             inline_data: {
               mime_type: clothing.mime_type,
               data: clothing.data
             }
-          }
-        ]
-      },
-      {
-        role: "user",
-        parts: [
+          },
           {
-            text: "Please generate an image of me wearing this clothing item, maintaining my pose and appearance while naturally integrating the clothing."
+            text: "Let the person wear the clothing. Same Pose"
           }
         ]
-      }],
+      }
+        // ,
+        // {
+        //   role: "user",
+        //   parts: [
+        //     {
+        //       text: "Please generate an image of me wearing this clothing item, maintaining my pose and appearance while naturally integrating the clothing."
+        //     }
+        //   ]
+        // }
+      ],
       generationConfig: {
-        temperature: 0.5,
-        topP: 0.5,
+        temperature: 1,
+        topP: 0.95,
         topK: 40,
         maxOutputTokens: 8192,
         responseModalities: ["Text", "Image"]
@@ -231,11 +218,9 @@ app.post('/api/tryon', async (c) => {
 
     const apiKey = c.env?.GOOGLE_API_KEY
     if (!apiKey) {
-      console.error('API key not configured')
       throw new Error('API key not configured')
     }
 
-    console.log('Sending request to Gemini API...')
 
     const apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent?key=' + apiKey
 
@@ -262,9 +247,6 @@ app.post('/api/tryon', async (c) => {
 
     console.log('Successfully received response from Gemini API')
     const data = await response.json()
-
-    console.log(data)
-    console.log(JSON.stringify(data, null, 4));
     const responseData = data as GeminiResponse
     console.log('Parsed API Response:', {
       candidates: responseData.candidates,

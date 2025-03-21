@@ -15,6 +15,9 @@ struct ContentView: View {
             .fullScreenCover(isPresented: $globalViewModel.isShowingPayWall) {
                 PayWallView()
             }
+            .fullScreenCover(isPresented: $globalViewModel.isShowingOnboarding) {
+                OnboardingView(isShowingOnboarding: $globalViewModel.isShowingOnboarding)
+            }
     }
 }
 

@@ -22,18 +22,22 @@ struct TryOnView: View {
                     
                     // Usage info for free users
                     if !globalViewModel.isPro {
-                        HStack {
-                            Image(systemName: "figure.wave")
-                                .foregroundColor(.blue)
-                            Text("You have \(globalViewModel.remainingUsesToday) try-ons left today")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                        Button {
+                            globalViewModel.isShowingPayWall = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "figure.wave")
+                                    .foregroundColor(.blue)
+                                Text("You have \(globalViewModel.remainingUsesToday) try-ons left today")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: Constants.cornerRadius)
+                                    .fill(Color.blue.opacity(0.1))
+                            )
                         }
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: Constants.cornerRadius)
-                                .fill(Color.blue.opacity(0.1))
-                        )
                     }
                     
                     // Image selection area
@@ -48,7 +52,7 @@ struct TryOnView: View {
                                 .foregroundColor(.secondary)
                                 .multilineTextAlignment(.center)
                             
-                            // Horizontal scroll for previous person photos
+                            // Horizontal scroll for person photos (including selected image)
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: Constants.spacing) {
                                     // Add new photo button
@@ -70,8 +74,54 @@ struct TryOnView: View {
                                         }
                                     }
                                     
-                                    // Previous photos from history
-                                    ForEach(viewModel.historyItems.filter { $0.personImage != nil }, id: \.id) { item in
+                                    // Current selected image (if any)
+                                    if let selectedImage = viewModel.personImage {
+                                        Button(action: {
+                                            logger.log("Opening person image picker to replace current")
+                                            showingPersonImagePicker = true
+                                        }) {
+                                            VStack {
+                                                Image(uiImage: selectedImage)
+                                                    .resizable()
+                                                    .scaledToFill()
+                                                    .frame(width: 100, height: 150)
+                                                    .clipped()
+                                                    .cornerRadius(Constants.cornerRadius)
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: Constants.cornerRadius)
+                                                            .stroke(Color.accentColor, lineWidth: 3)
+                                                    )
+                                                
+                                                Text("Current")
+                                                    .font(.caption)
+                                                    .foregroundColor(.primary)
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Previous photos from history, not including current
+                                    let historyItems = viewModel.historyItems
+                                        .filter { item in
+                                            
+                                            // Skip if it appears to be the current image
+                                            if let currentImage = viewModel.personImage {
+                                                // Compare dimensions as a simple way to detect likely duplicates
+                                                let sameSize = (
+                                                    abs(item.personImage.size.width - currentImage.size.width) < 1 &&
+                                                    abs(item.personImage.size.height - currentImage.size.height) < 1
+                                                )
+                                                
+                                                if sameSize {
+                                                    return false
+                                                }
+                                            }
+                                            
+                                            return true
+                                        }
+                                        .reversed() // Newest first
+                                    
+                                    // Display history items
+                                    ForEach(historyItems, id: \.id) { item in
                                         Button(action: {
                                             logger.log("Selected person image from history")
                                             viewModel.setPersonImage(item.personImage)
@@ -83,35 +133,18 @@ struct TryOnView: View {
                                                     .frame(width: 100, height: 150)
                                                     .clipped()
                                                     .cornerRadius(Constants.cornerRadius)
-                                                    .overlay(
-                                                        RoundedRectangle(cornerRadius: Constants.cornerRadius)
-                                                            .stroke(viewModel.personImage?.pngData() == item.personImage.pngData() ? Color.accentColor : Color.clear, lineWidth: 3)
-                                                    )
                                                 
-                                                Text("Photo \(viewModel.historyItems.firstIndex(where: { $0.id == item.id })?.advanced(by: 1) ?? 0)")
-                                                    .font(.caption)
-                                                    .foregroundColor(.primary)
+                                                if let index = viewModel.historyItems.firstIndex(where: { $0.id == item.id }) {
+                                                    Text("Photo \(index + 1)")
+                                                        .font(.caption)
+                                                        .foregroundColor(.primary)
+                                                }
                                             }
                                         }
                                     }
                                 }
                                 .padding(.horizontal)
                                 .padding(.vertical, 8)
-                            }
-                            
-                            // Currently selected image preview (larger)
-                            if let selectedImage = viewModel.personImage {
-                                Image(uiImage: selectedImage)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(height: 250)
-                                    .cornerRadius(Constants.cornerRadius)
-                                    .padding(.top, 8)
-                                
-                                Text("Tap to change")
-                                    .font(.caption)
-                                    .foregroundColor(.accentColor)
-                                    .padding(.top, 4)
                             }
                         }
                         .padding()
@@ -183,14 +216,16 @@ struct TryOnView: View {
                     HStack(spacing: Constants.spacing) {
                         // Try On button
                         Button {
+                            viewModel.isLoading = true
                             logger.log("Try On button tapped")
-                            
+                            //play haptic feedback
                             // Check if user can use feature
                             if globalViewModel.useFeature() {
                                 Task {
                                     await performTryOn()
                                 }
                             }
+                            
                         } label: {
                             HStack {
                                 if viewModel.isLoading {
@@ -256,9 +291,6 @@ struct TryOnView: View {
                     showingResultSheet = true
                     viewModel.resultProcessed = false
                 }
-            }
-            .fullScreenCover(isPresented: $globalViewModel.isShowingPayWall) {
-                PayWallView()
             }
             .alert(
                 viewModel.appError?.title ?? "Error",
@@ -347,4 +379,4 @@ struct TryOnView: View {
     TryOnView()
         .environmentObject(TryOnViewModel())
         .environmentObject(GlobalViewModel())
-} 
+}
