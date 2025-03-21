@@ -161,25 +161,52 @@ struct TryOnView: View {
                             logger.log("Opening clothing image picker")
                             showingClothImagePicker = true
                         }
-                    }
-                    
-                    if let resultImage = viewModel.resultImage {
-                        VStack {
-                            Text("Try-On Result")
+                        
+                        // Image count selection
+                        VStack(spacing: Constants.spacing) {
+                            Text("Generated Images")
                                 .font(.headline)
                             
-                            Image(uiImage: resultImage)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(maxHeight: 400)
+                            Text("Number of results to generate")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            
+                            Stepper("Generate \(viewModel.imageCount) image\(viewModel.imageCount > 1 ? "s" : "")", value: $viewModel.imageCount, in: 1...10)
+                                .padding()
+                                .background(Color(.tertiarySystemBackground))
                                 .cornerRadius(Constants.cornerRadius)
-                                .onTapGesture {
-                                    showingResultSheet = true
-                                }
                         }
                         .padding()
                         .background(Color(.secondarySystemBackground))
                         .cornerRadius(Constants.cornerRadius)
+                    }
+                    
+                    if !viewModel.resultImages.isEmpty {
+                        VStack {
+                            Text("Try-On Results")
+                                .font(.headline)
+                            
+                            // Preview of the first image
+                            Image(uiImage: viewModel.resultImage ?? UIImage())
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxHeight: 400)
+                                .cornerRadius(Constants.cornerRadius)
+                                .padding(.bottom, 8)
+                            
+                            // If there are multiple images, show an indicator
+                            if viewModel.resultImages.count > 1 {
+                                Text("Tap to view all \(viewModel.resultImages.count) results")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding()
+                        .background(Color(.secondarySystemBackground))
+                        .cornerRadius(Constants.cornerRadius)
+                        .onTapGesture {
+                            showingResultSheet = true
+                        }
                     }
                     
                     // Error message
@@ -289,8 +316,8 @@ struct TryOnView: View {
                 })
             }
             .sheet(isPresented: $showingResultSheet) {
-                if let resultImage = viewModel.resultImage, let lastResult = viewModel.historyItems.first {
-                    ResultSheetView(image: resultImage, resultId: lastResult.id)
+                if !viewModel.resultImages.isEmpty, let lastResult = viewModel.historyItems.first {
+                    ResultSheetView(images: viewModel.resultImages, resultId: lastResult.id)
                         .environmentObject(viewModel)
                 }
             }
@@ -331,7 +358,7 @@ struct TryOnView: View {
         await viewModel.tryOnCloth(freeRetry: false)
         viewModel.isLoading = false
         
-        if viewModel.resultImage != nil {
+        if !viewModel.resultImages.isEmpty {
             logger.log("Show result sheet after successful try-on")
             showingResultSheet = true
         }

@@ -32,10 +32,15 @@ class TryOnViewModel: ObservableObject {
     // Logger instance
     private let logger = Logger(subsystem: "com.juli.tryon", category: "TryOnViewModel")
     
+    // Configuration for number of images to generate
+    private let defaultImageCount = 4
+    @Published var imageCount: Int = 4
+    
     // Published properties for UI updates
     @Published var personImage: UIImage?
     @Published var clothImage: UIImage?
-    @Published var resultImage: UIImage?
+    @Published var resultImages: [UIImage] = []
+    @Published var selectedResultIndex: Int = 0
     @Published var historyItems: [TryOnResult] = []
     
     // Loading states
@@ -48,6 +53,11 @@ class TryOnViewModel: ObservableObject {
     // Alert handling
     @Published var appError: AppError?
     @Published var showingAlert = false
+    
+    // Computed property for backward compatibility
+    var resultImage: UIImage? {
+        resultImages.isEmpty ? nil : resultImages[selectedResultIndex]
+    }
     
     // Selection status
     var isPersonImageSelected: Bool {
@@ -63,11 +73,22 @@ class TryOnViewModel: ObservableObject {
     }
     
     // Init
-    init() {
-        logger.log("TryOnViewModel initialized")
+    init(imageCount: Int = 4) {
+        logger.log("TryOnViewModel initialized with imageCount: \(imageCount)")
+        self.imageCount = imageCount
         Task {
             await loadHistory()
         }
+    }
+    
+    // Configure the number of images to generate
+    func setImageCount(_ count: Int) {
+        guard count > 0 else {
+            logger.error("Invalid image count: \(count), must be > 0")
+            return
+        }
+        logger.log("Setting image count to: \(count)")
+        imageCount = count
     }
     
     // Load history from service
@@ -89,16 +110,18 @@ class TryOnViewModel: ObservableObject {
         
         isLoading = true
         errorMessage = nil
-        logger.log("Starting try-on process")
+        logger.log("Starting try-on process with \(self.imageCount) images")
         
         do {
             let result = try await tryOnService.tryOnCloth(
                 personImage: personImage, 
                 clothImage: clothImage,
-                isFreeRetry: freeRetry
+                isFreeRetry: freeRetry,
+                imageCount: imageCount
             )
-            resultImage = result.resultImage
-            await loadHistory()
+            resultImages = result.resultImages
+            selectedResultIndex = 0
+            // We no longer immediately save to history here - instead wait for user selection
             resultProcessed = true
         } catch {
             showError(error: error)
@@ -106,6 +129,36 @@ class TryOnViewModel: ObservableObject {
         
         isLoading = false
         logger.log("Try-on process finished")
+    }
+    
+    // Save the selected image to history
+    func saveSelectedImage(index: Int) async {
+        logger.log("Saving selected image at index \(index) to history")
+        
+        guard index >= 0 && index < resultImages.count else {
+            logger.error("Invalid index for saving image: \(index)")
+            return
+        }
+        
+        guard let personImage = personImage, let clothImage = clothImage else {
+            logger.error("Missing person or clothing image when saving selected result")
+            return
+        }
+        
+        // Get the selected image
+        let selectedImage = resultImages[index]
+        
+        // Create result with only the selected image
+        let result = try? await tryOnService.saveSelectedResult(
+            personImage: personImage,
+            clothImage: clothImage,
+            selectedImage: selectedImage
+        )
+        
+        // Reload history to show the new item
+        await loadHistory()
+        
+        logger.log("Selected image saved to history")
     }
     
     func showError(title: String = "Error", message: String) {
@@ -125,7 +178,8 @@ class TryOnViewModel: ObservableObject {
         logger.log("Resetting selections")
         personImage = nil
         clothImage = nil
-        resultImage = nil
+        resultImages = []
+        selectedResultIndex = 0
         errorMessage = nil
     }
     
@@ -134,6 +188,16 @@ class TryOnViewModel: ObservableObject {
         logger.log("Clearing history")
         await tryOnService.clearHistory()
         await loadHistory()
+    }
+    
+    // Select a specific result image by index
+    func selectResultImage(atIndex index: Int) {
+        guard index >= 0 && index < resultImages.count else {
+            logger.error("Invalid result image index: \(index)")
+            return
+        }
+        logger.log("Selected result image at index: \(index)")
+        selectedResultIndex = index
     }
     
     // Set person image with validation

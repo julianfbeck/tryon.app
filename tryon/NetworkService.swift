@@ -31,11 +31,16 @@ enum NetworkError: Error {
     }
 }
 
+// Response structure for multiple images
+struct MultiImageResponse: Decodable {
+    let images: [String]
+}
+
 actor NetworkService {
     private let logger = Logger(subsystem: "com.juli.tryon", category: "NetworkService")
     private let apiURL = "https://tryon.app.juli.sh/api/tryon"
     
-    func tryOnCloth(personImage: UIImage, clothImage: UIImage, isFreeRetry: Bool = false) async throws -> UIImage {
+    func tryOnCloth(personImage: UIImage, clothImage: UIImage, isFreeRetry: Bool = false, imageCount: Int = 4) async throws -> [UIImage] {
         guard let url = URL(string: apiURL) else {
             logger.error("Invalid URL: \(self.apiURL)")
             throw NetworkError.invalidURL
@@ -48,7 +53,7 @@ actor NetworkService {
             throw NetworkError.encodingError
         }
         
-        // Create request body with safety settings disabled
+        // Create request body without safety settings
         var requestBody: [String: Any] = [
             "person": [
                 "data": personBase64,
@@ -58,12 +63,7 @@ actor NetworkService {
                 "data": clothBase64,
                 "mime_type": "image/jpeg"
             ],
-            "safetySettings": [
-                ["category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"],
-                ["category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"],
-                ["category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"],
-                ["category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"]
-            ]
+            "imageCount": imageCount
         ]
         
         // Add free retry flag to inform the server (if needed)
@@ -88,10 +88,42 @@ actor NetworkService {
         }
         
         if httpResponse.statusCode >= 200 && httpResponse.statusCode < 300 {
-            guard let resultImage = UIImage(data: data) else {
-                throw NetworkError.decodingError
+            // Check the content type to determine how to handle the response
+            let contentType = httpResponse.value(forHTTPHeaderField: "Content-Type") ?? ""
+            
+            if contentType.contains("image/") {
+                // Direct image response (for single image case)
+                guard let resultImage = UIImage(data: data) else {
+                    throw NetworkError.decodingError
+                }
+                return [resultImage]
+            } else if contentType.contains("application/json") {
+                // JSON response with multiple images
+                do {
+                    let response = try JSONDecoder().decode(MultiImageResponse.self, from: data)
+                    
+                    // Convert base64 strings to images
+                    let images = try response.images.map { base64String -> UIImage in
+                        guard let imageData = Data(base64Encoded: base64String),
+                              let image = UIImage(data: imageData) else {
+                            throw NetworkError.decodingError
+                        }
+                        return image
+                    }
+                    
+                    guard !images.isEmpty else {
+                        throw NetworkError.noData
+                    }
+                    
+                    return images
+                } catch {
+                    logger.error("Failed to decode JSON response: \(error.localizedDescription)")
+                    throw NetworkError.decodingError
+                }
+            } else {
+                logger.error("Unexpected content type: \(contentType)")
+                throw NetworkError.invalidResponse
             }
-            return resultImage
         } else {
             let errorMessage = try? JSONDecoder().decode([String: String].self, from: data)["error"] ?? "Unknown error"
             throw NetworkError.serverError(httpResponse.statusCode, errorMessage ?? "Unknown error")

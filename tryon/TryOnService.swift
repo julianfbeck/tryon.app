@@ -10,7 +10,7 @@ struct TryOnResult: Identifiable, Codable {
     // Image file names - we'll store actual images separately
     let personImageFileName: String
     let clothImageFileName: String
-    let resultImageFileName: String
+    let resultImageFileNames: [String]
     
     // Static placeholder image
     static let placeholderImage = UIImage(systemName: "photo.fill") ?? UIImage()
@@ -24,8 +24,13 @@ struct TryOnResult: Identifiable, Codable {
         loadImage(fileName: clothImageFileName) ?? Self.placeholderImage
     }
     
+    var resultImages: [UIImage] {
+        resultImageFileNames.map { loadImage(fileName: $0) ?? Self.placeholderImage }
+    }
+    
+    // For backward compatibility
     var resultImage: UIImage {
-        loadImage(fileName: resultImageFileName) ?? Self.placeholderImage
+        resultImages.first ?? Self.placeholderImage
     }
     
     private func loadImage(fileName: String) -> UIImage? {
@@ -39,19 +44,30 @@ struct TryOnResult: Identifiable, Codable {
         return image
     }
     
-    init(id: UUID = UUID(), personImage: UIImage, clothImage: UIImage, resultImage: UIImage, timestamp: Date) {
+    init(id: UUID = UUID(), personImage: UIImage, clothImage: UIImage, resultImages: [UIImage], timestamp: Date) {
         self.id = id
         self.timestamp = timestamp
         
         // Generate unique filenames
         self.personImageFileName = "\(id)-person.jpg"
         self.clothImageFileName = "\(id)-cloth.jpg"
-        self.resultImageFileName = "\(id)-result.jpg"
+        self.resultImageFileNames = resultImages.enumerated().map { index, _ in
+            "\(id)-result-\(index).jpg"
+        }
         
         // Save images to disk
         self.saveImage(personImage, fileName: personImageFileName)
         self.saveImage(clothImage, fileName: clothImageFileName)
-        self.saveImage(resultImage, fileName: resultImageFileName)
+        
+        // Save all result images
+        for (index, image) in resultImages.enumerated() {
+            self.saveImage(image, fileName: resultImageFileNames[index])
+        }
+    }
+    
+    // Convenience initializer for a single result image
+    init(id: UUID = UUID(), personImage: UIImage, clothImage: UIImage, resultImage: UIImage, timestamp: Date) {
+        self.init(id: id, personImage: personImage, clothImage: clothImage, resultImages: [resultImage], timestamp: timestamp)
     }
     
     private func saveImage(_ image: UIImage, fileName: String) {
@@ -84,7 +100,11 @@ struct TryOnResultView: View {
             HStack(spacing: 8) {
                 makeImageView(result.personImage, "Person")
                 makeImageView(result.clothImage, "Clothing")
-                makeImageView(result.resultImage, "Result")
+                
+                // Display first result image in history view
+                if let firstResultImage = result.resultImages.first {
+                    makeImageView(firstResultImage, "Result")
+                }
             }
         }
         .padding()
@@ -126,19 +146,33 @@ actor TryOnService {
         loadHistoryFromDisk()
     }
     
-    func tryOnCloth(personImage: UIImage, clothImage: UIImage, isFreeRetry: Bool = false) async throws -> TryOnResult {
+    func tryOnCloth(personImage: UIImage, clothImage: UIImage, isFreeRetry: Bool = false, imageCount: Int = 4) async throws -> TryOnResult {
         // Call the API
-        let resultImage = try await networkService.tryOnCloth(
+        let resultImages = try await networkService.tryOnCloth(
             personImage: personImage,
             clothImage: clothImage,
-            isFreeRetry: isFreeRetry
+            isFreeRetry: isFreeRetry,
+            imageCount: imageCount
         )
         
-        // Create result
+        // Create temporary result for displaying - but don't save to history yet
         let result = TryOnResult(
             personImage: personImage,
             clothImage: clothImage,
-            resultImage: resultImage,
+            resultImages: resultImages,
+            timestamp: Date()
+        )
+        
+        return result
+    }
+    
+    // Save only the selected image to history
+    func saveSelectedResult(personImage: UIImage, clothImage: UIImage, selectedImage: UIImage) async -> TryOnResult {
+        // Create result with only the selected image
+        let result = TryOnResult(
+            personImage: personImage,
+            clothImage: clothImage,
+            resultImage: selectedImage,
             timestamp: Date()
         )
         

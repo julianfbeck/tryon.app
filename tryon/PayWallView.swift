@@ -115,35 +115,6 @@ struct PayWallView: View {
                     )
                     .padding(.horizontal)
                     
-                    // Adaptive usage section
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Smart Usage Limits")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                        
-                        Text("The free version adapts to you. When you're satisfied with results, you get more daily try-ons! Premium removes all limits.")
-                            .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.9))
-                            .multilineTextAlignment(.leading)
-                        
-                        HStack {
-                            Text("Your Current Limit:")
-                                .foregroundColor(.white.opacity(0.9))
-                            Text("\(globalViewModel.dailyUsageLimit) try-ons per day")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                        }
-                        .padding(.top, 4)
-                    }
-                    .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(Color.black.opacity(0.15))
-                    )
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                    
-                    // Pricing options
                     if let offering = globalViewModel.offering,
                        let annual = offering.annual,
                        let weekly = offering.weekly {

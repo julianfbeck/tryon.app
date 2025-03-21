@@ -2,25 +2,192 @@ import SwiftUI
 import PhotosUI
 
 struct ResultSheetView: View {
+    let images: [UIImage]
+    let resultId: UUID
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var viewModel: TryOnViewModel
+    @State private var isRetrying = false
+    @State private var selectedImageIndex = 0
+    @State private var showDetailView = false
+    
+    // Grid layout columns
+    let columns = [
+        GridItem(.flexible()),
+        GridItem(.flexible())
+    ]
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Header text
+                    Text("Choose your favorite result")
+                        .font(.headline)
+                        .padding(.top)
+                    
+                    // Grid of images
+                    LazyVGrid(columns: columns, spacing: 12) {
+                        ForEach(0..<images.count, id: \.self) { index in
+                            ZStack(alignment: .topTrailing) {
+                                Image(uiImage: images[index])
+                                    .resizable()
+                                    .scaledToFill() // Fill the frame
+                                    .frame(width: UIScreen.main.bounds.width / 2.3, height: UIScreen.main.bounds.width / 2.3) // Square frame
+                                    .clipped() // Clip any overflow
+                                    .cornerRadius(Constants.cornerRadius)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: Constants.cornerRadius)
+                                            .stroke(index == selectedImageIndex ? Color.accentColor : Color.clear, lineWidth: 3)
+                                    )
+                                    .onTapGesture {
+                                        selectedImageIndex = index
+                                    }
+                                
+                                // Selection checkmark
+                                if index == selectedImageIndex {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.title)
+                                        .foregroundColor(.accentColor)
+                                        .background(Circle().fill(Color.white))
+                                        .padding(8)
+                                }
+                            }
+                            .padding(4) // Add padding around each item
+                        }
+                    }
+                    .padding(.horizontal)
+                    
+                    // Action buttons (using the same style as TryOnView)
+                    HStack(spacing: 12) {
+                        // Select button (primary style)
+                        NavigationLink {
+                            ResultDetailView(
+                                image: images[selectedImageIndex],
+                                resultId: resultId,
+                                personImage: viewModel.personImage ?? UIImage(),
+                                clothImage: viewModel.clothImage ?? UIImage()
+                            )
+                            .environmentObject(viewModel)
+                        } label: {
+                            Text("Select")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.accentColor)
+                                .cornerRadius(Constants.cornerRadius)
+                        }
+                        
+                        // Try Again button (outline style)
+                        Button {
+                            isRetrying = true
+                            Task {
+                                await retryTryOn()
+                            }
+                        } label: {
+                            HStack {
+                                if isRetrying {
+                                    ProgressView()
+                                        .tint(Color.accentColor)
+                                        .padding(.trailing, 4)
+                                }
+                                Text(isRetrying ? "Processing..." : "Try Again")
+                                    .font(.headline)
+                            }
+                            .foregroundColor(Color.accentColor)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color(.systemBackground))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Constants.cornerRadius)
+                                    .stroke(Color.accentColor, lineWidth: 1)
+                            )
+                            .cornerRadius(Constants.cornerRadius)
+                        }
+                        .disabled(isRetrying)
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 12)
+                }
+                .padding(.bottom)
+            }
+            .navigationTitle("Try-On Results")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+    
+    // Function to retry the try-on without using credits
+    private func retryTryOn() async {
+        // Set loading state
+        isRetrying = true
+        
+        // Call tryOnCloth without decrementing usage count
+        await viewModel.tryOnCloth(freeRetry: true)
+        
+        // Update UI state
+        isRetrying = false
+        
+        // Close this sheet as the new result will show in a new sheet
+        dismiss()
+    }
+}
+
+// Second screen showing the detail view of the selected image
+struct ResultDetailView: View {
     let image: UIImage
     let resultId: UUID
+    let personImage: UIImage
+    let clothImage: UIImage
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var viewModel: TryOnViewModel
     @State private var showingSaveSuccess = false
     @State private var userRating: UserRating = .none
-    @State private var isRetrying = false
     
     enum UserRating {
         case none, like, dislike
     }
     
     var body: some View {
-        NavigationStack {
-            VStack {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .padding()
+        ScrollView {
+            VStack(spacing: 16) {
+                // Selected image (large view)
+                VStack(spacing: 8) {
+                    Text("Selected Image")
+                        .font(.headline)
+                        .padding(.top)
+                    
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxHeight: 400)
+                        .cornerRadius(Constants.cornerRadius)
+                        .padding(.horizontal)
+                }
+                
+                // Save to history button (if not yet rated)
+                if userRating == .none {
+                    Button {
+                        Task {
+                            await viewModel.saveSelectedImage(index: viewModel.selectedResultIndex)
+                        }
+                    } label: {
+                        Text("Save to History")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.accentColor)
+                            .cornerRadius(Constants.cornerRadius)
+                    }
+                    .padding(.horizontal)
+                }
                 
                 // Satisfaction question
                 if userRating == .none {
@@ -55,6 +222,11 @@ struct ResultSheetView: View {
                                 // Play success feedback
                                 let generator = UINotificationFeedbackGenerator()
                                 generator.notificationOccurred(.success)
+                                
+                                // Save to history on like
+                                Task {
+                                    await viewModel.saveSelectedImage(index: viewModel.selectedResultIndex)
+                                }
                             } label: {
                                 VStack {
                                     Image(systemName: "hand.thumbsup.fill")
@@ -74,41 +246,10 @@ struct ResultSheetView: View {
                     .background(Color(.secondarySystemBackground))
                     .cornerRadius(Constants.cornerRadius)
                     .padding(.horizontal)
-                    .padding(.bottom, 20)
+                    .padding(.vertical, 20)
                 }
                 
-                // Try Again button (shows up after negative rating)
-                if userRating == .dislike {
-                    Button {
-                        isRetrying = true
-                        Task {
-                            await retryTryOn()
-                        }
-                    } label: {
-                        HStack {
-                            if isRetrying {
-                                ProgressView()
-                                    .tint(.white)
-                                    .padding(.trailing, 4)
-                            }
-                            Text(isRetrying ? "Processing..." : "Try Again")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.accentColor)
-                        .cornerRadius(Constants.cornerRadius)
-                    }
-                    .disabled(isRetrying)
-                    .padding(.horizontal)
-                    .padding(.bottom, 20)
-                }
-                
-                Text("Your Try-On Result")
-                    .font(.headline)
-                    .padding(.bottom)
-                
+                // Action buttons for sharing and saving
                 HStack(spacing: 20) {
                     // Share button
                     ShareLink(item: Image(uiImage: image), preview: SharePreview("Try-On Result", image: Image(uiImage: image))) {
@@ -126,7 +267,7 @@ struct ResultSheetView: View {
                     
                     // Save to photos button
                     Button {
-                        saveImageToPhotoLibrary()
+                        saveImageToPhotoLibrary(image)
                     } label: {
                         VStack {
                             Image(systemName: "photo.on.rectangle")
@@ -142,49 +283,62 @@ struct ResultSheetView: View {
                 }
                 .padding(.horizontal)
                 
-                Spacer()
-            }
-            .padding()
-            .navigationTitle("Try-On Result")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
+                // Source images section
+                VStack(spacing: 8) {
+                    Text("Source Images")
+                        .font(.headline)
+                        .padding(.top)
+                    
+                    HStack(spacing: 12) {
+                        VStack {
+                            Image(uiImage: personImage)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 120)
+                                .cornerRadius(Constants.cornerRadius)
+                            
+                            Text("Person")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        VStack {
+                            Image(uiImage: clothImage)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 120)
+                                .cornerRadius(Constants.cornerRadius)
+                            
+                            Text("Clothing")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
+                    .padding(.horizontal)
                 }
             }
-            .alert("Image Saved", isPresented: $showingSaveSuccess) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text("The image has been saved to your photo library.")
-            }
+            .padding(.bottom)
+        }
+        .navigationTitle("Selected Result")
+        .navigationBarTitleDisplayMode(.inline)
+        .alert("Image Saved", isPresented: $showingSaveSuccess) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("The image has been saved to your photo library.")
         }
     }
     
-    // Function to save the image to the photo library
-    private func saveImageToPhotoLibrary() {
+    // Function to save an image to the photo library
+    private func saveImageToPhotoLibrary(_ image: UIImage) {
         UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
         showingSaveSuccess = true
-    }
-    
-    // Function to retry the try-on without using credits
-    private func retryTryOn() async {
-        // Set loading state
-        isRetrying = true
-        
-        // Call tryOnCloth without decrementing usage count
-        await viewModel.tryOnCloth(freeRetry: true)
-        
-        // Update UI state
-        isRetrying = false
-        
-        // Close this sheet as the new result will show in a new sheet
-        dismiss()
     }
 }
 
 #Preview {
-    ResultSheetView(image: UIImage(systemName: "person.fill")!, resultId: UUID())
-        .environmentObject(TryOnViewModel())
+    ResultSheetView(
+        images: [UIImage(systemName: "person.fill")!, UIImage(systemName: "person.crop.square")!],
+        resultId: UUID()
+    )
+    .environmentObject(TryOnViewModel())
 } 
