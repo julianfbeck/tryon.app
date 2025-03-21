@@ -35,16 +35,75 @@ class GlobalViewModel: ObservableObject {
         }
     }
     
+    // Sentiment tracking
+    @Published var userSentiment: Double {
+        didSet {
+            UserDefaults.standard.set(userSentiment, forKey: "userSentiment")
+            updateDailyLimit()
+        }
+    }
+    @Published var dailyUsageLimit: Int {
+        didSet {
+            UserDefaults.standard.set(dailyUsageLimit, forKey: "dailyUsageLimit")
+        }
+    }
+    @Published var dailyUsageCount: Int {
+        didSet {
+            UserDefaults.standard.set(dailyUsageCount, forKey: "dailyUsageCount")
+        }
+    }
+    @Published var lastUsageDate: Date? {
+        didSet {
+            if let date = lastUsageDate {
+                UserDefaults.standard.set(date, forKey: "lastUsageDate")
+            }
+        }
+    }
+    @Published var shouldShowFeedback: Bool = false
+    @Published var lastResultID: UUID?
+    
     private let maxUsageCount: Int = 3
     private let featureKey = "finalUsageCountforReal!11"
+    private let baseDailyLimit: Int = 3
+    private let maxDailyLimit: Int = 10
+    private let sentimentThreshold: Double = 4.0
     let maxDownlaods: Int = 3
     
     init() {
+        // Initialize all properties first
         self.isPro = UserDefaults.standard.bool(forKey: "isPro")
         self.downloadCount = UserDefaults.standard.integer(forKey: "downloadCount")
+        
         let currentUsage = PersistentUserDefaults.shared.integer(forKey: featureKey)
         self.remainingUses = max(0, maxUsageCount - currentUsage)
         self.canUseForFree = currentUsage < maxUsageCount
+        
+        // Initialize sentiment tracking
+        self.userSentiment = UserDefaults.standard.double(forKey: "userSentiment")
+        self.dailyUsageLimit = UserDefaults.standard.integer(forKey: "dailyUsageLimit")
+        self.dailyUsageCount = UserDefaults.standard.integer(forKey: "dailyUsageCount")
+        
+        if let savedDate = UserDefaults.standard.object(forKey: "lastUsageDate") as? Date {
+            self.lastUsageDate = savedDate
+        } else {
+            self.lastUsageDate = Date()
+        }
+        
+        // Now that all properties are initialized, we can perform additional setup
+        
+        // Reset daily count if it's a new day
+        if let savedDate = self.lastUsageDate, !Calendar.current.isDate(savedDate, inSameDayAs: Date()) {
+            self.dailyUsageCount = 0
+        }
+        
+        // Set initial daily limit if needed
+        if self.dailyUsageLimit == 0 {
+            self.dailyUsageLimit = baseDailyLimit
+        } else {
+            // Update daily limit based on sentiment
+            self.updateDailyLimit()
+        }
+        
         if self.isPro {
             self.canUseForFree = true
         }
@@ -99,7 +158,6 @@ class GlobalViewModel: ObservableObject {
         }
     }
     
-    
     private func updateProStatus(_ isPro: Bool) {
         self.isPro = isPro
         UserDefaults.standard.set(isPro, forKey: "isPro")
@@ -108,20 +166,79 @@ class GlobalViewModel: ObservableObject {
         }
     }
     
-    func useFeature() {
+    func useFeature() -> Bool {
         if isPro {
-            return
+            return true
         }
+        
+        // Check if it's a new day
+        if let lastDate = lastUsageDate, !Calendar.current.isDate(lastDate, inSameDayAs: Date()) {
+            dailyUsageCount = 0
+            lastUsageDate = Date()
+        } else if lastUsageDate == nil {
+            lastUsageDate = Date()
+        }
+        
+        // Check daily limit
+        if dailyUsageCount >= dailyUsageLimit {
+            isShowingPayWall = true
+            return false
+        }
+        
+        // Increment usage count
+        dailyUsageCount += 1
+        lastUsageDate = Date()
+        
+        // Legacy usage tracking
         let currentUsage = PersistentUserDefaults.shared.integer(forKey: featureKey)
         if currentUsage <= maxUsageCount {
             PersistentUserDefaults.shared.set(currentUsage + 1, forKey: featureKey)
             updateUsageStatus()
+        }
+        
+        return true
+    }
+    
+    func recordSentiment(rating: Int, for resultID: UUID) {
+        // Prevent double-rating
+        if lastResultID == resultID {
+            return
+        }
+        
+        lastResultID = resultID
+        
+        // Update sentiment (on a scale of 1-5)
+        let newRating = Double(rating)
+        
+        // If sentiment was previously 0 (not set), just use the new rating
+        if userSentiment == 0 {
+            userSentiment = newRating
+        } else {
+            // Otherwise, do a weighted average (30% new rating, 70% previous sentiment)
+            userSentiment = (userSentiment * 0.7) + (newRating * 0.3)
+        }
+        
+        // Update daily limit based on new sentiment
+        updateDailyLimit()
+    }
+    
+    private func updateDailyLimit() {
+        if userSentiment >= sentimentThreshold {
+            // High satisfaction, give more uses
+            dailyUsageLimit = min(maxDailyLimit, baseDailyLimit + Int(userSentiment - sentimentThreshold) * 2)
+        } else if userSentiment > 0 {
+            // Lower satisfaction, reduce uses
+            dailyUsageLimit = max(1, baseDailyLimit - Int(sentimentThreshold - userSentiment))
+        } else {
+            // Default if no sentiment recorded
+            dailyUsageLimit = baseDailyLimit
         }
     }
     
     func resetUsage() {
         PersistentUserDefaults.shared.set(0, forKey: featureKey)
         updateUsageStatus()
+        dailyUsageCount = 0
     }
     
     private func updateUsageStatus() {
@@ -132,6 +249,11 @@ class GlobalViewModel: ObservableObject {
     
     func incrementDownloadCount() {
         downloadCount += 1
+    }
+    
+    // Return remaining uses for today
+    var remainingUsesToday: Int {
+        return max(0, dailyUsageLimit - dailyUsageCount)
     }
 }
 

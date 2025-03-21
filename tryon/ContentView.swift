@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var globalViewModel: GlobalViewModel
+    
     var body: some View {
         MainTabView()
             .fullScreenCover(isPresented: $globalViewModel.isShowingPayWall) {
@@ -19,4 +20,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+        .environmentObject(GlobalViewModel())
 }

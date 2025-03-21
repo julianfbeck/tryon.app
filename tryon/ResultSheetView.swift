@@ -3,8 +3,11 @@ import PhotosUI
 
 struct ResultSheetView: View {
     let image: UIImage
+    let resultId: UUID
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var globalViewModel: GlobalViewModel
     @State private var showingSaveSuccess = false
+    @State private var hasRated = false
     
     var body: some View {
         NavigationStack {
@@ -13,6 +16,57 @@ struct ResultSheetView: View {
                     .resizable()
                     .scaledToFit()
                     .padding()
+                
+                // Satisfaction question
+                if !hasRated {
+                    VStack(spacing: 10) {
+                        Text("Are you satisfied with this result?")
+                            .font(.headline)
+                        
+                        HStack(spacing: 20) {
+                            // Thumbs down
+                            Button {
+                                globalViewModel.recordSentiment(rating: 2, for: resultId)
+                                hasRated = true
+                            } label: {
+                                VStack {
+                                    Image(systemName: "hand.thumbsdown.fill")
+                                        .font(.system(size: 22))
+                                        .foregroundColor(.red)
+                                    Text("No")
+                                        .font(.caption)
+                                }
+                                .frame(width: 60)
+                                .padding()
+                                .background(Color(.tertiarySystemBackground))
+                                .cornerRadius(8)
+                            }
+                            
+                            // Thumbs up
+                            Button {
+                                globalViewModel.recordSentiment(rating: 4, for: resultId)
+                                hasRated = true
+                            } label: {
+                                VStack {
+                                    Image(systemName: "hand.thumbsup.fill")
+                                        .font(.system(size: 22))
+                                        .foregroundColor(.green)
+                                    Text("Yes")
+                                        .font(.caption)
+                                }
+                                .frame(width: 60)
+                                .padding()
+                                .background(Color(.tertiarySystemBackground))
+                                .cornerRadius(8)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(Constants.cornerRadius)
+                    .padding(.horizontal)
+                    .padding(.bottom, 20)
+                }
                 
                 Text("Your Try-On Result")
                     .font(.headline)
@@ -79,5 +133,6 @@ struct ResultSheetView: View {
 }
 
 #Preview {
-    ResultSheetView(image: UIImage(systemName: "person.fill")!)
+    ResultSheetView(image: UIImage(systemName: "person.fill")!, resultId: UUID())
+        .environmentObject(GlobalViewModel())
 } 

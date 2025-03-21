@@ -3,9 +3,12 @@ import os.log
 
 struct TryOnView: View {
     @EnvironmentObject var viewModel: TryOnViewModel
+    @EnvironmentObject var globalViewModel: GlobalViewModel
     @State private var showingPersonImagePicker = false
     @State private var showingClothImagePicker = false
     @State private var showingResultSheet = false
+    @State private var showingSatisfactionDialog = false
+    @State private var currentResultId: UUID?
     private let logger = Logger(subsystem: "com.juli.tryon", category: "TryOnView")
     
     var body: some View {
@@ -16,6 +19,22 @@ struct TryOnView: View {
                     Text("Virtual Try-On")
                         .font(.largeTitle)
                         .fontWeight(.bold)
+                    
+                    // Usage info for free users
+                    if !globalViewModel.isPro {
+                        HStack {
+                            Image(systemName: "figure.wave")
+                                .foregroundColor(.blue)
+                            Text("You have \(globalViewModel.remainingUsesToday) try-ons left today")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: Constants.cornerRadius)
+                                .fill(Color.blue.opacity(0.1))
+                        )
+                    }
                     
                     // Image selection area
                     VStack(spacing: Constants.largeSpacing) {
@@ -175,11 +194,11 @@ struct TryOnView: View {
                         // Try On button
                         Button {
                             logger.log("Try On button tapped")
-                            Task {
-                                await viewModel.tryOnCloth()
-                                if viewModel.resultImage != nil && !viewModel.isLoading {
-                                    logger.log("Show result sheet after successful try-on")
-                                    showingResultSheet = true
+                            
+                            // Check if user can use feature
+                            if globalViewModel.useFeature() {
+                                Task {
+                                    await performTryOn()
                                 }
                             }
                         } label: {
@@ -224,7 +243,6 @@ struct TryOnView: View {
                 }
                 .padding()
             }
-//            .navigationTitle("Try On")
             .sheet(isPresented: $showingPersonImagePicker) {
                 ImagePicker(image: $viewModel.personImage, onError: { errorMessage in
                     logger.error("Person image picker error: \(errorMessage)")
@@ -238,8 +256,8 @@ struct TryOnView: View {
                 })
             }
             .sheet(isPresented: $showingResultSheet) {
-                if let resultImage = viewModel.resultImage {
-                    ResultSheetView(image: resultImage)
+                if let resultImage = viewModel.resultImage, let lastResult = viewModel.historyItems.first {
+                    ResultSheetView(image: resultImage, resultId: lastResult.id)
                 }
             }
             .onChange(of: viewModel.resultProcessed) { _, newValue in
@@ -248,6 +266,9 @@ struct TryOnView: View {
                     showingResultSheet = true
                     viewModel.resultProcessed = false
                 }
+            }
+            .fullScreenCover(isPresented: $globalViewModel.isShowingPayWall) {
+                PayWallView()
             }
             .alert(
                 viewModel.appError?.title ?? "Error",
@@ -270,6 +291,15 @@ struct TryOnView: View {
             .onDisappear {
                 logger.log("TryOnView disappeared")
             }
+        }
+    }
+    
+    // Function to perform try-on after usage check
+    private func performTryOn() async {
+        await viewModel.tryOnCloth()
+        if viewModel.resultImage != nil && !viewModel.isLoading {
+            logger.log("Show result sheet after successful try-on")
+            showingResultSheet = true
         }
     }
     
@@ -326,4 +356,5 @@ struct TryOnView: View {
 #Preview {
     TryOnView()
         .environmentObject(TryOnViewModel())
+        .environmentObject(GlobalViewModel())
 } 
