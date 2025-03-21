@@ -19,17 +19,85 @@ struct TryOnView: View {
                     
                     // Image selection area
                     VStack(spacing: Constants.largeSpacing) {
-                        // Person image selection
-                        selectionCard(
-                            title: "Your Photo",
-                            subtitle: "Select a clear photo of yourself",
-                            systemImage: "person.fill",
-                            isSelected: viewModel.isPersonImageSelected,
-                            selectedImage: viewModel.personImage
-                        ) {
-                            logger.log("Opening person image picker")
-                            showingPersonImagePicker = true
+                        // Person image selection with history
+                        VStack(spacing: Constants.spacing) {
+                            Text("Your Photo")
+                                .font(.headline)
+                            
+                            Text("Select a clear photo of yourself")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                            
+                            // Horizontal scroll for previous person photos
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: Constants.spacing) {
+                                    // Add new photo button
+                                    Button(action: {
+                                        logger.log("Opening person image picker")
+                                        showingPersonImagePicker = true
+                                    }) {
+                                        VStack {
+                                            Image(systemName: "plus")
+                                                .font(.system(size: 30))
+                                                .foregroundColor(.accentColor)
+                                                .frame(width: 100, height: 150)
+                                                .background(Color(.tertiarySystemBackground))
+                                                .cornerRadius(Constants.cornerRadius)
+                                            
+                                            Text("New")
+                                                .font(.caption)
+                                                .foregroundColor(.primary)
+                                        }
+                                    }
+                                    
+                                    // Previous photos from history
+                                    ForEach(viewModel.historyItems.filter { $0.personImage != nil }, id: \.id) { item in
+                                        Button(action: {
+                                            logger.log("Selected person image from history")
+                                            viewModel.setPersonImage(item.personImage)
+                                        }) {
+                                            VStack {
+                                                Image(uiImage: item.personImage)
+                                                    .resizable()
+                                                    .scaledToFill()
+                                                    .frame(width: 100, height: 150)
+                                                    .clipped()
+                                                    .cornerRadius(Constants.cornerRadius)
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: Constants.cornerRadius)
+                                                            .stroke(viewModel.personImage?.pngData() == item.personImage.pngData() ? Color.accentColor : Color.clear, lineWidth: 3)
+                                                    )
+                                                
+                                                Text("Photo \(viewModel.historyItems.firstIndex(where: { $0.id == item.id })?.advanced(by: 1) ?? 0)")
+                                                    .font(.caption)
+                                                    .foregroundColor(.primary)
+                                            }
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal)
+                                .padding(.vertical, 8)
+                            }
+                            
+                            // Currently selected image preview (larger)
+                            if let selectedImage = viewModel.personImage {
+                                Image(uiImage: selectedImage)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(height: 250)
+                                    .cornerRadius(Constants.cornerRadius)
+                                    .padding(.top, 8)
+                                
+                                Text("Tap to change")
+                                    .font(.caption)
+                                    .foregroundColor(.accentColor)
+                                    .padding(.top, 4)
+                            }
                         }
+                        .padding()
+                        .background(Color(.secondarySystemBackground))
+                        .cornerRadius(Constants.cornerRadius)
                         
                         // Cloth image selection
                         selectionCard(
@@ -194,6 +262,10 @@ struct TryOnView: View {
             }
             .onAppear {
                 logger.log("TryOnView appeared")
+                // Load history when view appears
+                Task {
+                    await viewModel.loadHistory()
+                }
             }
             .onDisappear {
                 logger.log("TryOnView disappeared")
