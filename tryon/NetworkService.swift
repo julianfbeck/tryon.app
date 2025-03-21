@@ -35,7 +35,7 @@ actor NetworkService {
     private let logger = Logger(subsystem: "com.juli.tryon", category: "NetworkService")
     private let apiURL = "https://tryon.app.juli.sh/api/tryon"
     
-    func tryOnCloth(personImage: UIImage, clothImage: UIImage) async throws -> UIImage {
+    func tryOnCloth(personImage: UIImage, clothImage: UIImage, isFreeRetry: Bool = false) async throws -> UIImage {
         guard let url = URL(string: apiURL) else {
             logger.error("Invalid URL: \(self.apiURL)")
             throw NetworkError.invalidURL
@@ -49,7 +49,7 @@ actor NetworkService {
         }
         
         // Create request body with safety settings disabled
-        let requestBody: [String: Any] = [
+        var requestBody: [String: Any] = [
             "person": [
                 "data": personBase64,
                 "mime_type": "image/jpeg"
@@ -65,6 +65,11 @@ actor NetworkService {
                 ["category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"]
             ]
         ]
+        
+        // Add free retry flag to inform the server (if needed)
+        if isFreeRetry {
+            requestBody["isFreeRetry"] = true
+        }
         
         // Create request
         var request = URLRequest(url: url)

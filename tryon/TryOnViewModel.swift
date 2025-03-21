@@ -78,8 +78,8 @@ class TryOnViewModel: ObservableObject {
     }
     
     // Try on function
-    func tryOnCloth() async {
-        logger.log("tryOnCloth called")
+    func tryOnCloth(freeRetry: Bool = false) async {
+        logger.log("tryOnCloth called with freeRetry: \(freeRetry)")
         
         guard let personImage = personImage, let clothImage = clothImage else {
             logger.error("Missing images for try-on")
@@ -92,7 +92,11 @@ class TryOnViewModel: ObservableObject {
         logger.log("Starting try-on process")
         
         do {
-            let result = try await tryOnService.tryOnCloth(personImage: personImage, clothImage: clothImage)
+            let result = try await tryOnService.tryOnCloth(
+                personImage: personImage, 
+                clothImage: clothImage,
+                isFreeRetry: freeRetry
+            )
             resultImage = result.resultImage
             await loadHistory()
             resultProcessed = true

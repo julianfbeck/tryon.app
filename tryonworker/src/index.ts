@@ -193,7 +193,7 @@ app.post('/api/tryon', async (c) => {
             }
           },
           {
-            text: "Let the person wear the clothing. Same Pose"
+            text: "Make the person in the first image wear the clothing in the second image"
           }
         ]
       }
@@ -208,7 +208,7 @@ app.post('/api/tryon', async (c) => {
         // }
       ],
       generationConfig: {
-        temperature: 1,
+        temperature: 0.95,
         topP: 0.95,
         topK: 40,
         maxOutputTokens: 8192,

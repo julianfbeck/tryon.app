@@ -5,9 +5,14 @@ struct ResultSheetView: View {
     let image: UIImage
     let resultId: UUID
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var globalViewModel: GlobalViewModel
+    @EnvironmentObject var viewModel: TryOnViewModel
     @State private var showingSaveSuccess = false
-    @State private var hasRated = false
+    @State private var userRating: UserRating = .none
+    @State private var isRetrying = false
+    
+    enum UserRating {
+        case none, like, dislike
+    }
     
     var body: some View {
         NavigationStack {
@@ -18,7 +23,7 @@ struct ResultSheetView: View {
                     .padding()
                 
                 // Satisfaction question
-                if !hasRated {
+                if userRating == .none {
                     VStack(spacing: 10) {
                         Text("Are you satisfied with this result?")
                             .font(.headline)
@@ -26,8 +31,10 @@ struct ResultSheetView: View {
                         HStack(spacing: 20) {
                             // Thumbs down
                             Button {
-                                globalViewModel.recordSentiment(rating: 2, for: resultId)
-                                hasRated = true
+                                userRating = .dislike
+                                // Play haptic feedback
+                                let generator = UINotificationFeedbackGenerator()
+                                generator.notificationOccurred(.warning)
                             } label: {
                                 VStack {
                                     Image(systemName: "hand.thumbsdown.fill")
@@ -44,8 +51,10 @@ struct ResultSheetView: View {
                             
                             // Thumbs up
                             Button {
-                                globalViewModel.recordSentiment(rating: 4, for: resultId)
-                                hasRated = true
+                                userRating = .like
+                                // Play success feedback
+                                let generator = UINotificationFeedbackGenerator()
+                                generator.notificationOccurred(.success)
                             } label: {
                                 VStack {
                                     Image(systemName: "hand.thumbsup.fill")
@@ -64,6 +73,34 @@ struct ResultSheetView: View {
                     .padding()
                     .background(Color(.secondarySystemBackground))
                     .cornerRadius(Constants.cornerRadius)
+                    .padding(.horizontal)
+                    .padding(.bottom, 20)
+                }
+                
+                // Try Again button (shows up after negative rating)
+                if userRating == .dislike {
+                    Button {
+                        isRetrying = true
+                        Task {
+                            await retryTryOn()
+                        }
+                    } label: {
+                        HStack {
+                            if isRetrying {
+                                ProgressView()
+                                    .tint(.white)
+                                    .padding(.trailing, 4)
+                            }
+                            Text(isRetrying ? "Processing..." : "Try Again")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.accentColor)
+                        .cornerRadius(Constants.cornerRadius)
+                    }
+                    .disabled(isRetrying)
                     .padding(.horizontal)
                     .padding(.bottom, 20)
                 }
@@ -130,9 +167,24 @@ struct ResultSheetView: View {
         UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
         showingSaveSuccess = true
     }
+    
+    // Function to retry the try-on without using credits
+    private func retryTryOn() async {
+        // Set loading state
+        isRetrying = true
+        
+        // Call tryOnCloth without decrementing usage count
+        await viewModel.tryOnCloth(freeRetry: true)
+        
+        // Update UI state
+        isRetrying = false
+        
+        // Close this sheet as the new result will show in a new sheet
+        dismiss()
+    }
 }
 
 #Preview {
     ResultSheetView(image: UIImage(systemName: "person.fill")!, resultId: UUID())
-        .environmentObject(GlobalViewModel())
+        .environmentObject(TryOnViewModel())
 } 

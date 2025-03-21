@@ -262,5 +262,17 @@ class GlobalViewModel: ObservableObject {
     var remainingUsesToday: Int {
         return max(0, dailyUsageLimit - dailyUsageCount)
     }
+    
+    func getLastRating(for resultID: UUID) -> Int? {
+        // If this is the last rated result, return the sentiment converted to 1-5 scale
+        if resultID == lastResultID {
+            if userSentiment == 0 {
+                return nil
+            }
+            // Convert sentiment to an integer rating
+            return Int(userSentiment.rounded())
+        }
+        return nil
+    }
 }
 

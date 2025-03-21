@@ -126,11 +126,12 @@ actor TryOnService {
         loadHistoryFromDisk()
     }
     
-    func tryOnCloth(personImage: UIImage, clothImage: UIImage) async throws -> TryOnResult {
+    func tryOnCloth(personImage: UIImage, clothImage: UIImage, isFreeRetry: Bool = false) async throws -> TryOnResult {
         // Call the API
         let resultImage = try await networkService.tryOnCloth(
             personImage: personImage,
-            clothImage: clothImage
+            clothImage: clothImage,
+            isFreeRetry: isFreeRetry
         )
         
         // Create result
