@@ -153,7 +153,7 @@ struct TryOnView: View {
                         // Cloth image selection
                         selectionCard(
                             title: "Clothing Item",
-                            subtitle: "Select a clothing item to try on",
+                            subtitle: "Select a photo of a single clothing item for best results",
                             systemImage: "tshirt.fill",
                             isSelected: viewModel.isClothImageSelected,
                             selectedImage: viewModel.clothImage
