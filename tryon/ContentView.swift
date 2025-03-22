@@ -18,7 +18,11 @@ struct ContentView: View {
             .fullScreenCover(isPresented: $globalViewModel.isShowingOnboarding) {
                 OnboardingView(isShowingOnboarding: $globalViewModel.isShowingOnboarding)
                     .onDisappear {
-                        globalViewModel.isShowingRatings = true
+                        if globalViewModel.isFirstLaunch {
+                            globalViewModel.isShowingRatings = true
+                        } else if !globalViewModel.isPro {
+                            globalViewModel.isShowingPayWall = true
+                        }
                     }
             }
             .fullScreenCover(isPresented: $globalViewModel.isShowingRatings) {

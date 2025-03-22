@@ -91,11 +91,6 @@ struct PayWallView: View {
                             .font(.system(size: 32, weight: .bold))
                             .foregroundColor(.white)
                             .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 2)
-                        
-                        Text("Unlimited virtual try-ons with premium quality")
-                            .font(.headline)
-                            .foregroundColor(.white.opacity(0.9))
-                            .multilineTextAlignment(.center)
                     }
                     .padding(.top, 20)
                     
@@ -103,9 +98,6 @@ struct PayWallView: View {
                     VStack(alignment: .leading, spacing: 20) {
                         FeatureRow(icon: "tshirt.fill", text: "Unlimited Try-On sessions")
                         FeatureRow(icon: "star.fill", text: "No daily usage limits")
-                        FeatureRow(icon: "archivebox", text: "Unlimited history storage")
-                        FeatureRow(icon: "lock.slash", text: "Remove all restrictions")
-                        FeatureRow(icon: "photo.fill", text: "High-resolution results")
                     }
                     .padding(.vertical, 16)
                     .padding(.horizontal, 8)
@@ -202,6 +194,22 @@ struct PayWallView: View {
                                 .background(Color.black.opacity(0.25))
                                 .cornerRadius(16)
                             }
+                            
+                            // Free Trial Toggle Section
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Free Trial")
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                    .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                                
+                                Toggle("Enable 3-Day Free Trial", isOn: $isFreeTrialEnabled)
+                                    .tint(.orange)
+                                    .foregroundColor(.white)
+                            }
+                            .padding()
+                            .background(Color.black.opacity(0.25))
+                            .cornerRadius(16)
                             
                             // Purchase button
                             Button(action: {

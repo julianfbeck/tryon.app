@@ -29,6 +29,8 @@ struct SettingsView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Settings")
+                                    .font(.largeTitle)
+                                    .fontWeight(.bold)
                                 
                                 if globalViewModel.isPro {
                                     HStack {
