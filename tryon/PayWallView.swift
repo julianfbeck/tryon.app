@@ -17,8 +17,8 @@ import SwiftUI
 
 
 struct PayWallView: View {
-    private let privacyPolicyURL = URL(string: "https://julianbeck.notion.site/Privacy-Policy-0b9f619292cd4c64927e16267a48ca02")!
-    private let termsOfServiceURL = URL(string: "https://julianbeck.notion.site/Terms-of-Service-a0f22f25f7804ce9a2590bbba3f63cb9")!
+    private let privacyPolicyURL = URL(string: "https://julianbeck.notion.site/Privacy-Policy-for-VirtualTryOn-1be96d29972e80c2980fc188097002ec?pvs=4")!
+    private let termsOfServiceURL = URL(string: "https://julianbeck.notion.site/VirtualTryOn-1be96d29972e8003a48bd5f6b3652936?pvs=73")!
     
     @EnvironmentObject var globalViewModel: GlobalViewModel
     @Environment(\.presentationMode) var presentationMode

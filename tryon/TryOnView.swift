@@ -277,8 +277,8 @@ struct TryOnView: View {
                             .background(Color.accentColor)
                             .cornerRadius(Constants.cornerRadius)
                         }
-                        .disabled(!viewModel.canTryOn || viewModel.isLoading || (!globalViewModel.isPro && globalViewModel.remainingUsesToday <= 0))
-                        .opacity(viewModel.canTryOn && !viewModel.isLoading && (globalViewModel.isPro || globalViewModel.remainingUsesToday > 0) ? 1 : 0.5)
+                        .disabled(!viewModel.canTryOn || viewModel.isLoading )
+                        .opacity(viewModel.canTryOn && !viewModel.isLoading  ? 1 : 0.5)
                         
                         // Reset button
                         Button {

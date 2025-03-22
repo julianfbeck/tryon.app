@@ -6,9 +6,9 @@ struct SettingsView: View {
     @EnvironmentObject private var globalViewModel: GlobalViewModel
     
     // URLs for legal documents
-    private let privacyURL = URL(string: "https://julianbeck.notion.site/Privacy-Policy-for-TryOn-16f96d29972e803db34ef8b4a558c1a4")!
-    private let termsURL = URL(string: "https://julianbeck.notion.site/TryOn-16f96d29972e8004a92afaca97d753b0")!
-    private let supportURL = URL(string: "https://julianbeck.notion.site/TryOn-Support-13296d29972e807ba819e0385fbed4df")!
+    private let privacyURL = URL(string: "https://julianbeck.notion.site/Privacy-Policy-for-VirtualTryOn-1be96d29972e80c2980fc188097002ec?pvs=4")!
+    private let termsURL = URL(string: "https://julianbeck.notion.site/VirtualTryOn-1be96d29972e8003a48bd5f6b3652936?pvs=73")!
+    private let supportURL = URL(string: "https://julianbeck.notion.site/15696d29972e80b59185e8aae36dcda0?pvs=105")!
     
     var body: some View {
         NavigationStack {

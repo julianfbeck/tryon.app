@@ -114,6 +114,13 @@ struct ResultSheetView: View {
                     }
                     .padding(.horizontal)
                     .padding(.top, 12)
+                    
+                    // Disclaimer text
+                    Text("Note: The AI model may not always produce perfect results on the first try. Feel free to use the Try Again option for potentially better results.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                 }
                 .padding(.bottom)
             }
