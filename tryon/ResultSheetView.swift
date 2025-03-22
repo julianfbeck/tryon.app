@@ -17,112 +17,120 @@ struct ResultSheetView: View {
         GridItem(.flexible())
     ]
     
+    // Maximum content width for iPad
+    private let maxContentWidth: CGFloat = 650
+    
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
-                    // Header text
-                    Text("Choose your favorite result")
-                        .font(.headline)
-                        .padding(.top)
-                    
-                    // Grid of images
-                    LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(0..<images.count, id: \.self) { index in
-                            ZStack(alignment: .topTrailing) {
-                                Image(uiImage: images[index])
-                                    .resizable()
-                                    .scaledToFill() // Fill the frame
-                                    .frame(width: UIScreen.main.bounds.width / 2.3, height: UIScreen.main.bounds.width / 2.3) // Square frame
-                                    .clipped() // Clip any overflow
-                                    .cornerRadius(Constants.cornerRadius)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: Constants.cornerRadius)
-                                            .stroke(index == selectedImageIndex ? Color.accentColor : Color.clear, lineWidth: 3)
-                                    )
-                                    .onTapGesture {
-                                        selectedImageIndex = index
+                // Center the content and limit width for iPad
+                VStack {
+                    VStack(spacing: 20) {
+                        // Header text
+                        Text("Choose your favorite result")
+                            .font(.headline)
+                            .padding(.top)
+                        
+                        // Grid of images
+                        LazyVGrid(columns: columns, spacing: 12) {
+                            ForEach(0..<images.count, id: \.self) { index in
+                                ZStack(alignment: .topTrailing) {
+                                    Image(uiImage: images[index])
+                                        .resizable()
+                                        .scaledToFill() // Fill the frame
+                                        .frame(width: UIScreen.main.bounds.width / 2.3, height: UIScreen.main.bounds.width / 2.3) // Square frame
+                                        .clipped() // Clip any overflow
+                                        .cornerRadius(Constants.cornerRadius)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: Constants.cornerRadius)
+                                                .stroke(index == selectedImageIndex ? Color.accentColor : Color.clear, lineWidth: 3)
+                                        )
+                                        .onTapGesture {
+                                            selectedImageIndex = index
+                                        }
+                                    
+                                    // Selection checkmark
+                                    if index == selectedImageIndex {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.title)
+                                            .foregroundColor(.accentColor)
+                                            .background(Circle().fill(Color.white))
+                                            .padding(8)
                                     }
-                                
-                                // Selection checkmark
-                                if index == selectedImageIndex {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.title)
-                                        .foregroundColor(.accentColor)
-                                        .background(Circle().fill(Color.white))
-                                        .padding(8)
                                 }
+                                .padding(4) // Add padding around each item
                             }
-                            .padding(4) // Add padding around each item
                         }
-                    }
-                    .padding(.horizontal)
-                    
-                    // Action buttons (using the same style as TryOnView)
-                    HStack(spacing: 12) {
-                        // Select button (primary style)
-                        NavigationLink {
-                            ResultDetailView(
-                                image: images[selectedImageIndex],
-                                resultId: resultId,
-                                personImage: viewModel.personImage ?? UIImage(),
-                                clothImage: viewModel.clothImage ?? UIImage()
-                            )
-                            .environmentObject(viewModel)
-                        } label: {
-                            Text("Select")
-                                .font(.headline)
-                                .foregroundColor(.white)
+                        .padding(.horizontal)
+                        
+                        // Action buttons (using the same style as TryOnView)
+                        HStack(spacing: 12) {
+                            // Select button (primary style)
+                            NavigationLink {
+                                ResultDetailView(
+                                    image: images[selectedImageIndex],
+                                    resultId: resultId,
+                                    personImage: viewModel.personImage ?? UIImage(),
+                                    clothImage: viewModel.clothImage ?? UIImage()
+                                )
+                                .environmentObject(viewModel)
+                            } label: {
+                                Text("Select")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.accentColor)
+                                    .cornerRadius(Constants.cornerRadius)
+                            }
+                            
+                            // Try Again button (outline style)
+                            Button {
+                                isRetrying = true
+                                Task {
+                                    await retryTryOn()
+                                }
+                            } label: {
+                                HStack {
+                                    if isRetrying {
+                                        ProgressView()
+                                            .tint(Color.accentColor)
+                                            .padding(.trailing, 4)
+                                    }
+                                    Text(isRetrying ? "Processing..." : "Try Again")
+                                        .font(.headline)
+                                    if !isRetrying {
+                                        Text("(\(remainingRetries)/1)")
+                                            .font(.subheadline)
+                                            .foregroundColor(remainingRetries > 0 ? .accentColor : .secondary)
+                                    }
+                                }
+                                .foregroundColor(remainingRetries > 0 ? .accentColor : .secondary)
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(Color.accentColor)
+                                .background(Color(.systemBackground))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: Constants.cornerRadius)
+                                        .stroke(remainingRetries > 0 ? Color.accentColor : Color.secondary, lineWidth: 1)
+                                )
                                 .cornerRadius(Constants.cornerRadius)
-                        }
-                        
-                        // Try Again button (outline style)
-                        Button {
-                            isRetrying = true
-                            Task {
-                                await retryTryOn()
                             }
-                        } label: {
-                            HStack {
-                                if isRetrying {
-                                    ProgressView()
-                                        .tint(Color.accentColor)
-                                        .padding(.trailing, 4)
-                                }
-                                Text(isRetrying ? "Processing..." : "Try Again")
-                                    .font(.headline)
-                                if !isRetrying {
-                                    Text("(\(remainingRetries)/1)")
-                                        .font(.subheadline)
-                                        .foregroundColor(remainingRetries > 0 ? .accentColor : .secondary)
-                                }
-                            }
-                            .foregroundColor(remainingRetries > 0 ? .accentColor : .secondary)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color(.systemBackground))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Constants.cornerRadius)
-                                    .stroke(remainingRetries > 0 ? Color.accentColor : Color.secondary, lineWidth: 1)
-                            )
-                            .cornerRadius(Constants.cornerRadius)
+                            .disabled(isRetrying || remainingRetries == 0)
                         }
-                        .disabled(isRetrying || remainingRetries == 0)
-                    }
-                    .padding(.horizontal)
-                    .padding(.top, 12)
-                    
-                    // Disclaimer text
-                    Text("Note: The AI model may not always produce perfect results on the first try. Feel free to use the Try Again option for potentially better results.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
                         .padding(.horizontal)
+                        .padding(.top, 12)
+                        
+                        // Disclaimer text
+                        Text("Note: The AI model may not always produce perfect results on the first try. Feel free to use the Try Again option for potentially better results.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                    .padding(.bottom)
+                    .frame(maxWidth: maxContentWidth)
                 }
-                .padding(.bottom)
+                .frame(maxWidth: .infinity) // This ensures content is centered
             }
             .navigationTitle("Try-On Results")
             .navigationBarTitleDisplayMode(.inline)
@@ -174,135 +182,143 @@ struct ResultDetailView: View {
     @State private var userRating: UserRating = .none
     @State private var hasSavedToHistory = false
     
+    // Maximum content width for iPad
+    private let maxContentWidth: CGFloat = 650
+    
     enum UserRating {
         case none, like, dislike
     }
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                // Selected image (large view)
-                VStack(spacing: 8) {
-                    Text("Selected Image")
-                        .font(.headline)
-                        .padding(.top)
-                    
-                    Image(uiImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(maxHeight: 400)
-                        .cornerRadius(Constants.cornerRadius)
-                        .padding(.horizontal)
-                }
-                
-                // Satisfaction question
-                if userRating == .none {
-                    VStack(spacing: 10) {
-                        Text("Are you satisfied with this result?")
+            // Center the content and limit width for iPad
+            VStack {
+                VStack(spacing: 16) {
+                    // Selected image (large view)
+                    VStack(spacing: 8) {
+                        Text("Selected Image")
                             .font(.headline)
+                            .padding(.top)
                         
-                        HStack(spacing: 20) {
-                            // Thumbs down
-                            Button {
-                                userRating = .dislike
-                                // Track dislike
-                                Plausible.shared.trackEvent(event: "tryon_interaction", path: "/results", properties: [
-                                    "action": "feedback",
-                                    "sentiment": "dislike",
-                                    "result_id": resultId.uuidString
-                                ])
-                                // Play haptic feedback
-                                let generator = UINotificationFeedbackGenerator()
-                                generator.notificationOccurred(.warning)
-                            } label: {
-                                VStack {
-                                    Image(systemName: "hand.thumbsdown.fill")
-                                        .font(.system(size: 22))
-                                        .foregroundColor(.red)
-                                }
-                                .frame(width: 60)
-                                .padding()
-                                .background(Color(.tertiarySystemBackground))
-                                .cornerRadius(8)
-                            }
-                            
-                            // Thumbs up
-                            Button {
-                                userRating = .like
-                                // Track like
-                                Plausible.shared.trackEvent(event: "tryon_interaction", path: "/results", properties: [
-                                    "action": "feedback",
-                                    "sentiment": "like",
-                                    "result_id": resultId.uuidString
-                                ])
-                                // Play success feedback
-                                let generator = UINotificationFeedbackGenerator()
-                                generator.notificationOccurred(.success)
-                            } label: {
-                                VStack {
-                                    Image(systemName: "hand.thumbsup.fill")
-                                        .font(.system(size: 22))
-                                        .foregroundColor(.green)
-                                }
-                                .frame(width: 60)
-                                .padding()
-                                .background(Color(.tertiarySystemBackground))
-                                .cornerRadius(8)
-                            }
-                        }
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxHeight: 400)
+                            .cornerRadius(Constants.cornerRadius)
+                            .padding(.horizontal)
                     }
-                    .padding()
-                    .padding(.horizontal)
-                    .padding(.vertical, 20)
-                }
-                
-                // Action buttons for sharing and saving
-                HStack(spacing: 20) {
-                    // Share button
-                    ShareLink(item: Image(uiImage: image), preview: SharePreview("Try-On Result", image: Image(uiImage: image))) {
-                        VStack {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 24))
-                            Text("Share")
-                                .font(.caption)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color(.secondarySystemBackground))
-                        .cornerRadius(Constants.cornerRadius)
-                    }
-                    .simultaneousGesture(TapGesture().onEnded {
-                        // Track share attempt
-                        Plausible.shared.trackEvent(event: "tryon_interaction", path: "/results", properties: [
-                            "action": "share",
-                            "result_id": resultId.uuidString
-                        ])
-                    })
                     
-                    // Save to photos button
-                    Button {
-                        saveImageToPhotoLibrary(image)
-                        // Track save to photos
-                        Plausible.shared.trackEvent(event: "tryon_interaction", path: "/results", properties: [
-                            "action": "save",
-                            "result_id": resultId.uuidString
-                        ])
-                    } label: {
-                        VStack {
-                            Image(systemName: "photo.on.rectangle")
-                                .font(.system(size: 24))
-                            Text("Save")
-                                .font(.caption)
+                    // Satisfaction question
+                    if userRating == .none {
+                        VStack(spacing: 10) {
+                            Text("Are you satisfied with this result?")
+                                .font(.headline)
+                            
+                            HStack(spacing: 20) {
+                                // Thumbs down
+                                Button {
+                                    userRating = .dislike
+                                    // Track dislike
+                                    Plausible.shared.trackEvent(event: "tryon_interaction", path: "/results", properties: [
+                                        "action": "feedback",
+                                        "sentiment": "dislike",
+                                        "result_id": resultId.uuidString
+                                    ])
+                                    // Play haptic feedback
+                                    let generator = UINotificationFeedbackGenerator()
+                                    generator.notificationOccurred(.warning)
+                                } label: {
+                                    VStack {
+                                        Image(systemName: "hand.thumbsdown.fill")
+                                            .font(.system(size: 22))
+                                            .foregroundColor(.red)
+                                    }
+                                    .frame(width: 60)
+                                    .padding()
+                                    .background(Color(.tertiarySystemBackground))
+                                    .cornerRadius(8)
+                                }
+                                
+                                // Thumbs up
+                                Button {
+                                    userRating = .like
+                                    // Track like
+                                    Plausible.shared.trackEvent(event: "tryon_interaction", path: "/results", properties: [
+                                        "action": "feedback",
+                                        "sentiment": "like",
+                                        "result_id": resultId.uuidString
+                                    ])
+                                    // Play success feedback
+                                    let generator = UINotificationFeedbackGenerator()
+                                    generator.notificationOccurred(.success)
+                                } label: {
+                                    VStack {
+                                        Image(systemName: "hand.thumbsup.fill")
+                                            .font(.system(size: 22))
+                                            .foregroundColor(.green)
+                                    }
+                                    .frame(width: 60)
+                                    .padding()
+                                    .background(Color(.tertiarySystemBackground))
+                                    .cornerRadius(8)
+                                }
+                            }
                         }
-                        .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color(.secondarySystemBackground))
-                        .cornerRadius(Constants.cornerRadius)
+                        .padding(.horizontal)
+                        .padding(.vertical, 20)
                     }
+                    
+                    // Action buttons for sharing and saving
+                    HStack(spacing: 20) {
+                        // Share button
+                        ShareLink(item: Image(uiImage: image), preview: SharePreview("Try-On Result", image: Image(uiImage: image))) {
+                            VStack {
+                                Image(systemName: "square.and.arrow.up")
+                                    .font(.system(size: 24))
+                                Text("Share")
+                                    .font(.caption)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color(.secondarySystemBackground))
+                            .cornerRadius(Constants.cornerRadius)
+                        }
+                        .simultaneousGesture(TapGesture().onEnded {
+                            // Track share attempt
+                            Plausible.shared.trackEvent(event: "tryon_interaction", path: "/results", properties: [
+                                "action": "share",
+                                "result_id": resultId.uuidString
+                            ])
+                        })
+                        
+                        // Save to photos button
+                        Button {
+                            saveImageToPhotoLibrary(image)
+                            // Track save to photos
+                            Plausible.shared.trackEvent(event: "tryon_interaction", path: "/results", properties: [
+                                "action": "save",
+                                "result_id": resultId.uuidString
+                            ])
+                        } label: {
+                            VStack {
+                                Image(systemName: "photo.on.rectangle")
+                                    .font(.system(size: 24))
+                                Text("Save")
+                                    .font(.caption)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color(.secondarySystemBackground))
+                            .cornerRadius(Constants.cornerRadius)
+                        }
+                    }
+                    .padding(.horizontal)
                 }
-                .padding(.horizontal)
+                .padding(.bottom)
+                .frame(maxWidth: maxContentWidth)
             }
-            .padding(.bottom)
+            .frame(maxWidth: .infinity) // This ensures content is centered
         }
         .navigationTitle("Selected Result")
         .navigationBarTitleDisplayMode(.inline)
