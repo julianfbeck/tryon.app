@@ -146,7 +146,7 @@ actor TryOnService {
         loadHistoryFromDisk()
     }
     
-    func tryOnCloth(personImage: UIImage, clothImage: UIImage, isFreeRetry: Bool = false, imageCount: Int = 4) async throws -> TryOnResult {
+    func tryOnCloth(personImage: UIImage, clothImage: UIImage, isFreeRetry: Bool = false, imageCount: Int = 4, resultId: UUID? = nil) async throws -> TryOnResult {
         // Call the API
         let resultImages = try await networkService.tryOnCloth(
             personImage: personImage,
@@ -157,6 +157,7 @@ actor TryOnService {
         
         // Create temporary result for displaying - but don't save to history yet
         let result = TryOnResult(
+            id: resultId ?? UUID(),
             personImage: personImage,
             clothImage: clothImage,
             resultImages: resultImages,

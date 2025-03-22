@@ -99,7 +99,7 @@ class TryOnViewModel: ObservableObject {
     }
     
     // Try on function
-    func tryOnCloth(freeRetry: Bool = false) async {
+    func tryOnCloth(freeRetry: Bool = false, resultId: UUID? = nil) async {
         logger.log("tryOnCloth called with freeRetry: \(freeRetry)")
         
         guard let personImage = personImage, let clothImage = clothImage else {
@@ -117,7 +117,8 @@ class TryOnViewModel: ObservableObject {
                 personImage: personImage, 
                 clothImage: clothImage,
                 isFreeRetry: freeRetry,
-                imageCount: imageCount
+                imageCount: imageCount,
+                resultId: resultId
             )
             resultImages = result.resultImages
             selectedResultIndex = 0

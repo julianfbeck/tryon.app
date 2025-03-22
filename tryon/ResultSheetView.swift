@@ -138,7 +138,7 @@ struct ResultSheetView: View {
         remainingRetries -= 1
         
         // Call tryOnCloth without decrementing usage count
-        await viewModel.tryOnCloth(freeRetry: true)
+        await viewModel.tryOnCloth(freeRetry: true, resultId: resultId)
         
         // Update UI state
         isRetrying = false

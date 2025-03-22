@@ -316,14 +316,15 @@ struct TryOnView: View {
                 })
             }
             .sheet(isPresented: $showingResultSheet) {
-                if !viewModel.resultImages.isEmpty, let lastResult = viewModel.historyItems.first {
-                    ResultSheetView(images: viewModel.resultImages, resultId: lastResult.id)
+                if !viewModel.resultImages.isEmpty {
+                    ResultSheetView(images: viewModel.resultImages, resultId: currentResultId ?? UUID())
                         .environmentObject(viewModel)
                 }
             }
             .onChange(of: viewModel.resultProcessed) { _, newValue in
                 if newValue {
                     logger.log("Result processed, showing result sheet")
+                    currentResultId = UUID()
                     showingResultSheet = true
                     viewModel.resultProcessed = false
                 }
@@ -360,6 +361,7 @@ struct TryOnView: View {
         
         if !viewModel.resultImages.isEmpty {
             logger.log("Show result sheet after successful try-on")
+            currentResultId = UUID()
             showingResultSheet = true
         }
     }
