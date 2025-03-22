@@ -74,6 +74,11 @@ class GlobalViewModel: ObservableObject {
     private let sentimentThreshold: Double = 4.0
     let maxDownlaods: Int = 3
     
+    // Track if this is the first launch
+    private var isFirstLaunch: Bool {
+        return isShowingOnboarding
+    }
+    
     init() {
         // Initialize all properties first
         self.isPro = UserDefaults.standard.bool(forKey: "isPro")
@@ -116,9 +121,10 @@ class GlobalViewModel: ObservableObject {
             self.canUseForFree = true
         }
         
-        self.isPro = true
-        self.remainingUses = 0
-        self.canUseForFree = true
+        // If user is not pro and has already seen onboarding, show paywall
+        if !self.isPro && !self.isShowingOnboarding {
+            self.isShowingPayWall = true
+        }
         
         setupPurchases()
         fetchOfferings()

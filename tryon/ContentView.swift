@@ -12,14 +12,14 @@ struct ContentView: View {
     
     var body: some View {
         MainTabView()
-            .fullScreenCover(isPresented: $globalViewModel.isShowingPayWall) {
-                PayWallView()
-            }
             .fullScreenCover(isPresented: $globalViewModel.isShowingOnboarding) {
                 OnboardingView(isShowingOnboarding: $globalViewModel.isShowingOnboarding)
                     .onDisappear {
                         globalViewModel.isShowingRatings = true
                     }
+            }
+            .fullScreenCover(isPresented: $globalViewModel.isShowingPayWall) {
+                PayWallView()
             }
             .fullScreenCover(isPresented: $globalViewModel.isShowingRatings) {
                 RatingRequestScreen(

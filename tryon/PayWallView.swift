@@ -196,14 +196,11 @@ struct PayWallView: View {
                             }
                             
                             // Free Trial Toggle Section
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Free Trial")
-                                    .font(.headline)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                    .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                            VStack(alignment: .leading, spacing: 3) {
                                 
                                 Toggle("Enable 3-Day Free Trial", isOn: $isFreeTrialEnabled)
+                                    .fontWeight(.bold)
+                                    .font(.headline)
                                     .tint(.orange)
                                     .foregroundColor(.white)
                             }
