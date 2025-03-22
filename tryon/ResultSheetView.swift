@@ -138,6 +138,13 @@ struct ResultSheetView: View {
     
     // Function to retry the try-on without using credits
     private func retryTryOn() async {
+        // Track retry attempt
+        Plausible.shared.trackEvent(event: "tryon_interaction", path: "/results", properties: [
+            "action": "retry",
+            "remaining_retries": String(remainingRetries),
+            "result_id": resultId.uuidString
+        ])
+        
         // Set loading state
         isRetrying = true
         
@@ -198,6 +205,12 @@ struct ResultDetailView: View {
                             // Thumbs down
                             Button {
                                 userRating = .dislike
+                                // Track dislike
+                                Plausible.shared.trackEvent(event: "tryon_interaction", path: "/results", properties: [
+                                    "action": "feedback",
+                                    "sentiment": "dislike",
+                                    "result_id": resultId.uuidString
+                                ])
                                 // Play haptic feedback
                                 let generator = UINotificationFeedbackGenerator()
                                 generator.notificationOccurred(.warning)
@@ -216,6 +229,12 @@ struct ResultDetailView: View {
                             // Thumbs up
                             Button {
                                 userRating = .like
+                                // Track like
+                                Plausible.shared.trackEvent(event: "tryon_interaction", path: "/results", properties: [
+                                    "action": "feedback",
+                                    "sentiment": "like",
+                                    "result_id": resultId.uuidString
+                                ])
                                 // Play success feedback
                                 let generator = UINotificationFeedbackGenerator()
                                 generator.notificationOccurred(.success)
@@ -252,10 +271,22 @@ struct ResultDetailView: View {
                         .background(Color(.secondarySystemBackground))
                         .cornerRadius(Constants.cornerRadius)
                     }
+                    .simultaneousGesture(TapGesture().onEnded {
+                        // Track share attempt
+                        Plausible.shared.trackEvent(event: "tryon_interaction", path: "/results", properties: [
+                            "action": "share",
+                            "result_id": resultId.uuidString
+                        ])
+                    })
                     
                     // Save to photos button
                     Button {
                         saveImageToPhotoLibrary(image)
+                        // Track save to photos
+                        Plausible.shared.trackEvent(event: "tryon_interaction", path: "/results", properties: [
+                            "action": "save",
+                            "result_id": resultId.uuidString
+                        ])
                     } label: {
                         VStack {
                             Image(systemName: "photo.on.rectangle")

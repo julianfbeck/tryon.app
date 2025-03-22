@@ -41,8 +41,15 @@ actor NetworkService {
     private let apiURL = "https://tryon.app.juli.sh/api/tryon"
     
     func tryOnCloth(personImage: UIImage, clothImage: UIImage, isFreeRetry: Bool = false, imageCount: Int = 4) async throws -> [UIImage] {
+        // Track attempt
+        Plausible.shared.trackEvent(event: "tryon_attempt", path: "/api/tryon", properties: [
+            "image_count": String(imageCount),
+            "is_free_retry": String(isFreeRetry)
+        ])
+        
         guard let url = URL(string: apiURL) else {
             logger.error("Invalid URL: \(self.apiURL)")
+            Plausible.shared.trackEvent(event: "tryon_error", path: "/api/tryon", properties: ["error": "invalid_url"])
             throw NetworkError.invalidURL
         }
         
@@ -50,6 +57,7 @@ actor NetworkService {
         guard let personBase64 = personImage.jpegData(compressionQuality: 0.5)?.base64EncodedString(),
               let clothBase64 = clothImage.jpegData(compressionQuality: 0.5)?.base64EncodedString() else {
             logger.error("Failed to encode images to base64")
+            Plausible.shared.trackEvent(event: "tryon_error", path: "/api/tryon", properties: ["error": "encoding_error"])
             throw NetworkError.encodingError
         }
         
@@ -88,6 +96,12 @@ actor NetworkService {
         }
         
         if httpResponse.statusCode >= 200 && httpResponse.statusCode < 300 {
+            // Track successful response
+            Plausible.shared.trackEvent(event: "tryon_success", path: "/api/tryon", properties: [
+                "image_count": String(imageCount),
+                "is_free_retry": String(isFreeRetry)
+            ])
+            
             // Check the content type to determine how to handle the response
             let contentType = httpResponse.value(forHTTPHeaderField: "Content-Type") ?? ""
             
@@ -126,6 +140,11 @@ actor NetworkService {
             }
         } else {
             let errorMessage = try? JSONDecoder().decode([String: String].self, from: data)["error"] ?? "Unknown error"
+            Plausible.shared.trackEvent(event: "tryon_error", path: "/api/tryon", properties: [
+                "error": "server_error",
+                "status_code": String(httpResponse.statusCode),
+                "message": errorMessage ?? "Unknown error"
+            ])
             throw NetworkError.serverError(httpResponse.statusCode, errorMessage ?? "Unknown error")
         }
     }
