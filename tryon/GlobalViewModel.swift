@@ -26,11 +26,6 @@ class GlobalViewModel: ObservableObject {
             UserDefaults.standard.set(!isShowingOnboarding, forKey: "hasSeenOnboarding")
         }
     }
-    @Published var isFirstLaunch: Bool {
-        didSet {
-            UserDefaults.standard.set(!isFirstLaunch, forKey: "isFirstLaunch")
-        }
-    }
     @Published var isShowingRatings = false
     @Published var remainingUses: Int
     @Published var canUseForFree: Bool
@@ -84,14 +79,8 @@ class GlobalViewModel: ObservableObject {
         self.isPro = UserDefaults.standard.bool(forKey: "isPro")
         self.downloadCount = UserDefaults.standard.integer(forKey: "downloadCount")
         
-        // Check if it's first launch
-        self.isFirstLaunch = !UserDefaults.standard.bool(forKey: "isFirstLaunch")
-        
         // Check if the user has seen the onboarding
         self.isShowingOnboarding = !UserDefaults.standard.bool(forKey: "hasSeenOnboarding")
-        
-        // Show paywall if not pro and not first launch
-        self.isShowingPayWall = !self.isPro && !self.isFirstLaunch
         
         let currentUsage = PersistentUserDefaults.shared.integer(forKey: featureKey)
         self.remainingUses = max(0, maxUsageCount - currentUsage)
