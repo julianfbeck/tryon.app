@@ -1,5 +1,5 @@
 {
-  "originHash" : "f92bae3346b0b6a0d5b1d37ec7b9ef03d6f2bbb7781767606965285b4774738d",
+  "originHash" : "59dfe5c9344db2b997c3b844d4b83a16471c6f24fbabfc237da8802c76ee3076",
   "pins" : [
     {
       "identity" : "purchases-ios",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "6e23b9f35228839a2264da96f454965568e2ad35",
         "version" : "5.20.1"
+      }
+    },
+    {
+      "identity" : "ratingskit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Sedlacek-Solutions/RatingsKit.git",
+      "state" : {
+        "revision" : "721c0aea2b07cfc08a82a9cbf3d95e5a2b607f3e",
+        "version" : "1.1.0"
       }
     },
     {

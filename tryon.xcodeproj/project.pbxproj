@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		9AD349062D8C08F600F295BF /* SwiftUIImageViewer in Frameworks */ = {isa = PBXBuildFile; productRef = 9AD349052D8C08F600F295BF /* SwiftUIImageViewer */; };
 		9AD3491B2D8D9B8800F295BF /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 9AD3491A2D8D9B8800F295BF /* RevenueCat */; };
+		9AED28772D8EF80A00A0EEB7 /* RatingsKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9AED28762D8EF80A00A0EEB7 /* RatingsKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9AED28772D8EF80A00A0EEB7 /* RatingsKit in Frameworks */,
 				9AD3491B2D8D9B8800F295BF /* RevenueCat in Frameworks */,
 				9AD349062D8C08F600F295BF /* SwiftUIImageViewer in Frameworks */,
 			);
@@ -74,6 +76,7 @@
 			packageProductDependencies = (
 				9AD349052D8C08F600F295BF /* SwiftUIImageViewer */,
 				9AD3491A2D8D9B8800F295BF /* RevenueCat */,
+				9AED28762D8EF80A00A0EEB7 /* RatingsKit */,
 			);
 			productName = tryon;
 			productReference = 9A0CB71F2D889E1900FD0F36 /* tryon.app */;
@@ -106,6 +109,7 @@
 			packageReferences = (
 				9AD349042D8C08F600F295BF /* XCRemoteSwiftPackageReference "swiftui-image-viewer" */,
 				9AD349192D8D9B8800F295BF /* XCRemoteSwiftPackageReference "purchases-ios" */,
+				9AED28752D8EF80A00A0EEB7 /* XCRemoteSwiftPackageReference "RatingsKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9A0CB7202D889E1900FD0F36 /* Products */;
@@ -357,6 +361,14 @@
 				minimumVersion = 5.20.1;
 			};
 		};
+		9AED28752D8EF80A00A0EEB7 /* XCRemoteSwiftPackageReference "RatingsKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Sedlacek-Solutions/RatingsKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.1.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -369,6 +381,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 9AD349192D8D9B8800F295BF /* XCRemoteSwiftPackageReference "purchases-ios" */;
 			productName = RevenueCat;
+		};
+		9AED28762D8EF80A00A0EEB7 /* RatingsKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9AED28752D8EF80A00A0EEB7 /* XCRemoteSwiftPackageReference "RatingsKit" */;
+			productName = RatingsKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

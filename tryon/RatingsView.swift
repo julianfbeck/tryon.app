@@ -1,11 +1,19 @@
+//
+//  RatingsView.swift
+//  tryon
+//
+//  Created by Julian Beck on 22.03.25.
+//
+
+
 import SwiftUI
 import RatingsKit
 
 struct RatingsView: View {
     var body: some View {
         RatingRequestScreen(
-            appId: "YOUR_APP_ID",
-            appRatingProvider: YourAppRatingProvider(),
+            appId: "6743625964",
+            appRatingProvider: MockAppRatingProvider.noRatingsOrReviews,
             primaryButtonAction: {
                 // Handle when user has requested to leave a rating
                 print("User tapped to leave a rating")

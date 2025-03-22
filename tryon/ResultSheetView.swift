@@ -149,6 +149,7 @@ struct ResultDetailView: View {
     @EnvironmentObject var viewModel: TryOnViewModel
     @State private var showingSaveSuccess = false
     @State private var userRating: UserRating = .none
+    @State private var hasSavedToHistory = false
     
     enum UserRating {
         case none, like, dislike
@@ -169,24 +170,6 @@ struct ResultDetailView: View {
                         .frame(maxHeight: 400)
                         .cornerRadius(Constants.cornerRadius)
                         .padding(.horizontal)
-                }
-                
-                // Save to history button (if not yet rated)
-                if userRating == .none {
-                    Button {
-                        Task {
-                            await viewModel.saveSelectedImage(index: viewModel.selectedResultIndex)
-                        }
-                    } label: {
-                        Text("Save to History")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.accentColor)
-                            .cornerRadius(Constants.cornerRadius)
-                    }
-                    .padding(.horizontal)
                 }
                 
                 // Satisfaction question
@@ -222,11 +205,6 @@ struct ResultDetailView: View {
                                 // Play success feedback
                                 let generator = UINotificationFeedbackGenerator()
                                 generator.notificationOccurred(.success)
-                                
-                                // Save to history on like
-                                Task {
-                                    await viewModel.saveSelectedImage(index: viewModel.selectedResultIndex)
-                                }
                             } label: {
                                 VStack {
                                     Image(systemName: "hand.thumbsup.fill")
@@ -325,6 +303,14 @@ struct ResultDetailView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text("The image has been saved to your photo library.")
+        }
+        .onAppear {
+            if !hasSavedToHistory {
+                Task {
+                    await viewModel.saveSelectedImage(index: viewModel.selectedResultIndex)
+                    hasSavedToHistory = true
+                }
+            }
         }
     }
     
