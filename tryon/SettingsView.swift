@@ -15,8 +15,8 @@ struct SettingsView: View {
             ZStack {
                 LinearGradient(
                     gradient: Gradient(colors: [
-                        Color.accentColor.opacity(0.8),
-                        Color.accentColor.opacity(0.6)
+                        Color.accentColor.opacity(0.3),
+                        Color.accentColor.opacity(0.5)
                     ]),
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
@@ -29,8 +29,6 @@ struct SettingsView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Settings")
-                                    .font(.system(size: 42, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white)
                                 
                                 if globalViewModel.isPro {
                                     HStack {
@@ -66,15 +64,12 @@ struct SettingsView: View {
                                     title: "Rate TryOn",
                                     subtitle: "Leave a review on the App Store"
                                 ) {
-                                    if let writeReviewURL = URL(string: "https://apps.apple.com/app/id6476532071?action=write-review") {
-                                        UIApplication.shared.open(writeReviewURL)
-                                    }
+                                    globalViewModel.isShowingRatings = true
                                 }
                             } header: {
                                 Text("Support & Info")
                                     .textCase(nil)
                                     .font(.title2)
-                                    .foregroundStyle(.white)
                                     .bold()
                             }
                             
@@ -100,7 +95,6 @@ struct SettingsView: View {
                                 Text("App Settings")
                                     .textCase(nil)
                                     .font(.title2)
-                                    .foregroundStyle(.white)
                                     .bold()
                             }
                             
@@ -135,7 +129,6 @@ struct SettingsView: View {
                                 Text("Legal")
                                     .textCase(nil)
                                     .font(.title2)
-                                    .foregroundStyle(.white)
                                     .bold()
                             }
                         }

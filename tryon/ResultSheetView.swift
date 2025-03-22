@@ -9,6 +9,7 @@ struct ResultSheetView: View {
     @State private var isRetrying = false
     @State private var selectedImageIndex = 0
     @State private var showDetailView = false
+    @State private var remainingRetries = 1
     
     // Grid layout columns
     let columns = [
@@ -93,18 +94,23 @@ struct ResultSheetView: View {
                                 }
                                 Text(isRetrying ? "Processing..." : "Try Again")
                                     .font(.headline)
+                                if !isRetrying {
+                                    Text("(\(remainingRetries)/1)")
+                                        .font(.subheadline)
+                                        .foregroundColor(remainingRetries > 0 ? .accentColor : .secondary)
+                                }
                             }
-                            .foregroundColor(Color.accentColor)
+                            .foregroundColor(remainingRetries > 0 ? .accentColor : .secondary)
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(Color(.systemBackground))
                             .overlay(
                                 RoundedRectangle(cornerRadius: Constants.cornerRadius)
-                                    .stroke(Color.accentColor, lineWidth: 1)
+                                    .stroke(remainingRetries > 0 ? Color.accentColor : Color.secondary, lineWidth: 1)
                             )
                             .cornerRadius(Constants.cornerRadius)
                         }
-                        .disabled(isRetrying)
+                        .disabled(isRetrying || remainingRetries == 0)
                     }
                     .padding(.horizontal)
                     .padding(.top, 12)
@@ -127,6 +133,9 @@ struct ResultSheetView: View {
     private func retryTryOn() async {
         // Set loading state
         isRetrying = true
+        
+        // Decrement remaining retries
+        remainingRetries -= 1
         
         // Call tryOnCloth without decrementing usage count
         await viewModel.tryOnCloth(freeRetry: true)
@@ -190,8 +199,6 @@ struct ResultDetailView: View {
                                     Image(systemName: "hand.thumbsdown.fill")
                                         .font(.system(size: 22))
                                         .foregroundColor(.red)
-                                    Text("No")
-                                        .font(.caption)
                                 }
                                 .frame(width: 60)
                                 .padding()
@@ -210,8 +217,6 @@ struct ResultDetailView: View {
                                     Image(systemName: "hand.thumbsup.fill")
                                         .font(.system(size: 22))
                                         .foregroundColor(.green)
-                                    Text("Yes")
-                                        .font(.caption)
                                 }
                                 .frame(width: 60)
                                 .padding()
@@ -221,8 +226,6 @@ struct ResultDetailView: View {
                         }
                     }
                     .padding()
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(Constants.cornerRadius)
                     .padding(.horizontal)
                     .padding(.vertical, 20)
                 }
@@ -260,40 +263,6 @@ struct ResultDetailView: View {
                     }
                 }
                 .padding(.horizontal)
-                
-                // Source images section
-                VStack(spacing: 8) {
-                    Text("Source Images")
-                        .font(.headline)
-                        .padding(.top)
-                    
-                    HStack(spacing: 12) {
-                        VStack {
-                            Image(uiImage: personImage)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(height: 120)
-                                .cornerRadius(Constants.cornerRadius)
-                            
-                            Text("Person")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        VStack {
-                            Image(uiImage: clothImage)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(height: 120)
-                                .cornerRadius(Constants.cornerRadius)
-                            
-                            Text("Clothing")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding(.horizontal)
-                }
             }
             .padding(.bottom)
         }

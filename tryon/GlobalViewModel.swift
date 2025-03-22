@@ -26,6 +26,7 @@ class GlobalViewModel: ObservableObject {
             UserDefaults.standard.set(!isShowingOnboarding, forKey: "hasSeenOnboarding")
         }
     }
+    @Published var isShowingRatings = false
     @Published var remainingUses: Int
     @Published var canUseForFree: Bool
     @Published var downloadCount: Int {

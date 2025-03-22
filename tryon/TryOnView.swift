@@ -163,22 +163,22 @@ struct TryOnView: View {
                         }
                         
                         // Image count selection
-                        VStack(spacing: Constants.spacing) {
-                            Text("Generated Images")
-                                .font(.headline)
-                            
-                            Text("Number of results to generate")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            
-                            Stepper("Generate \(viewModel.imageCount) image\(viewModel.imageCount > 1 ? "s" : "")", value: $viewModel.imageCount, in: 1...10)
-                                .padding()
-                                .background(Color(.tertiarySystemBackground))
-                                .cornerRadius(Constants.cornerRadius)
-                        }
-                        .padding()
-                        .background(Color(.secondarySystemBackground))
-                        .cornerRadius(Constants.cornerRadius)
+//                        VStack(spacing: Constants.spacing) {
+//                            Text("Generated Images")
+//                                .font(.headline)
+//                            
+//                            Text("Number of results to generate")
+//                                .font(.subheadline)
+//                                .foregroundColor(.secondary)
+//                            
+//                            Stepper("Generate \(viewModel.imageCount) image\(viewModel.imageCount > 1 ? "s" : "")", value: $viewModel.imageCount, in: 1...10)
+//                                .padding()
+//                                .background(Color(.tertiarySystemBackground))
+//                                .cornerRadius(Constants.cornerRadius)
+//                        }
+//                        .padding()
+//                        .background(Color(.secondarySystemBackground))
+//                        .cornerRadius(Constants.cornerRadius)
                     }
                     
                     if !viewModel.resultImages.isEmpty {
