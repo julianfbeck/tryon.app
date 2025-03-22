@@ -257,11 +257,7 @@ struct TryOnView: View {
                                     // Show paywall if out of uses
                                     globalViewModel.isShowingPayWall = true
                                 } else {
-                                    // Track usage in globalViewModel if not a pro user
-                                    if !globalViewModel.isPro {
-                                        globalViewModel.dailyUsageCount += 1
-                                    }
-                                    
+                                    // We'll consume the credit only after successful generation
                                     Task {
                                         await performTryOn()
                                     }
@@ -323,7 +319,7 @@ struct TryOnView: View {
                     viewModel.showError(title: "Image Error", message: errorMessage)
                 })
             }
-            .sheet(isPresented: $showingResultSheet) {
+            .fullScreenCover(isPresented: $showingResultSheet) {
                 if !viewModel.resultImages.isEmpty {
                     ResultSheetView(images: viewModel.resultImages, resultId: currentResultId ?? UUID())
                         .environmentObject(viewModel)
@@ -363,12 +359,22 @@ struct TryOnView: View {
     
     // Function to perform try-on after usage check
     private func performTryOn() async {
+        // Credit consumption logic:
+        // 1. We check if the user has enough credits (done in the button action)
+        // 2. We attempt the try-on operation
+        // 3. We only consume a credit if the image generation succeeds
+        
         viewModel.isLoading = true
         await viewModel.tryOnCloth(freeRetry: false)
         viewModel.isLoading = false
         
         if !viewModel.resultImages.isEmpty {
             logger.log("Show result sheet after successful try-on")
+            // Only consume a credit if the image generation was successful
+            if !globalViewModel.isPro {
+                // Increment daily usage count after successful generation
+                globalViewModel.useFeature()
+            }
             currentResultId = UUID()
             showingResultSheet = true
         }
