@@ -24,7 +24,7 @@ enum NetworkError: Error {
         case .decodingError:
             return "Failed to process server response"
         case .noData:
-            return "No data returned from server"
+            return "Error. Try using a different image"
         case .encodingError:
             return "Failed to encode the images"
         }

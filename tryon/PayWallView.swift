@@ -289,6 +289,8 @@ struct PayWallView: View {
         }
         .onAppear {
             startCloseButtonTimer()
+            Plausible.shared.trackPageview(path: "/paywall")
+            
         }
         .interactiveDismissDisabled(!showCloseButton)
     }

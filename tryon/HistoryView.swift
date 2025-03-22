@@ -75,19 +75,6 @@ struct HistoryView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
-            
-            NavigationLink {
-                TryOnView()
-            } label: {
-                Text("Try On Something New")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.accentColor)
-                    .cornerRadius(Constants.cornerRadius)
-                    .padding(.top, 20)
-            }
         }
         .padding(.vertical, 60)
     }

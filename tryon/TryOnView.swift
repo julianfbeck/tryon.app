@@ -15,7 +15,7 @@ struct TryOnView: View {
             ScrollView {
                 VStack(spacing: Constants.largeSpacing) {
                     // Header with app logo
-                    Text("Virtual Try-On")
+                    Text("Dresly")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                     

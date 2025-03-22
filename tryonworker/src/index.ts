@@ -123,7 +123,7 @@ app.post('/api/tryon', async (c) => {
       if (responseData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data) {
         return responseData.candidates[0].content.parts[0].inlineData.data
       } else {
-        throw new Error('No image data in response')
+        throw new Error('This didn\'t work. Try using a a clear image of the person and a clear image of the clothing. Sorry!')
       }
     }
 

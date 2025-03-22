@@ -74,6 +74,8 @@ struct OnboardingView: View {
                         }
                     } else {
                         isShowingOnboarding = false
+                        Plausible.shared.trackPageview(path:"/onboarding/finished")
+                            
                     }
                 }) {
                     Text(currentPage == onboardingPages.count - 1 ? "Get Started" : "Next")
